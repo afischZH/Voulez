@@ -70,4 +70,7 @@ export const LIMITS = {
   create: { limit: 5, windowSeconds: 3600 },
   /** Antwort abschicken */
   respond: { limit: 10, windowSeconds: 3600 },
+  /** Ticket per E-Mail — knapp gehalten, weil der Besucher die Zieladresse
+   *  frei tippt und der Endpunkt sonst als Versandweg missbraucht würde. */
+  ticketMail: { limit: 4, windowSeconds: 3600 },
 } as const

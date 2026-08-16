@@ -87,6 +87,8 @@ export type Database = {
         Row: {
           accepted: boolean
           created_at: string
+          custom_label: string | null
+          custom_time: boolean
           duration_min: number
           id: string
           message: string | null
@@ -97,6 +99,8 @@ export type Database = {
         Insert: {
           accepted?: boolean
           created_at?: string
+          custom_label?: string | null
+          custom_time?: boolean
           duration_min?: number
           id?: string
           message?: string | null
@@ -107,6 +111,8 @@ export type Database = {
         Update: {
           accepted?: boolean
           created_at?: string
+          custom_label?: string | null
+          custom_time?: boolean
           duration_min?: number
           id?: string
           message?: string | null
@@ -209,6 +215,7 @@ export type Database = {
       }
       vaults: {
         Row: {
+          allow_custom_proposal: boolean
           closing_text: string | null
           confirm_token_hash: string | null
           confirmed_at: string | null
@@ -232,6 +239,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          allow_custom_proposal?: boolean
           closing_text?: string | null
           confirm_token_hash?: string | null
           confirmed_at?: string | null
@@ -255,6 +263,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          allow_custom_proposal?: boolean
           closing_text?: string | null
           confirm_token_hash?: string | null
           confirmed_at?: string | null

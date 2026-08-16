@@ -111,7 +111,7 @@ export function CreateWizard() {
   if (sent) {
     return (
       <Shell>
-        <div className="text-center">
+        <div className="text-center print:hidden">
           <p className="text-2xs text-brass-dim tracking-[0.4em] uppercase">
             Fast fertig
           </p>
@@ -127,6 +127,34 @@ export function CreateWizard() {
             Diese E-Mail enthält auch deinen Verwaltungslink. Heb sie auf.
           </p>
         </div>
+
+        {/* Der Entwurf ist aus dem Speicher gelöscht und der Tresor selbst
+            bleibt bis zur Bestätigung unsichtbar — dieser Schirm ist der
+            einzige Ort, an dem die Angaben jetzt noch stehen. */}
+        <section className="border-steel-700 mt-10 border-t pt-8 print:mt-0 print:border-0 print:pt-0">
+          <header className="flex flex-wrap items-baseline justify-between gap-3">
+            <h2 className="font-display text-brass text-xl tracking-wide">
+              Deine Angaben
+            </h2>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="text-fog hover:text-brass text-sm underline underline-offset-4 print:hidden"
+            >
+              Drucken
+            </button>
+          </header>
+
+          <div className="mt-6">
+            <Summary draft={draft} />
+          </div>
+
+          <p className="text-fog-dim mt-6 text-sm print:hidden">
+            {draft.emailSummary
+              ? 'Dieselben Angaben stehen auch in der Bestätigungsmail.'
+              : 'Auf deinen Wunsch stehen diese Angaben nicht in der E-Mail — hier ist der einzige Ort.'}
+          </p>
+        </section>
       </Shell>
     )
   }
@@ -376,6 +404,26 @@ export function CreateWizard() {
               <CustomOption
                 onAdd={(option) => patch({ options: [...draft.options, option] })}
               />
+
+              {/* Der Gegenentwurf zur Auswahl darüber: wer das anhakt, gibt die
+                  Entscheidung ganz aus der Hand — der Besuch darf dann auch
+                  etwas nennen, das hier nirgends steht. */}
+              <label className="border-steel-600/70 flex cursor-pointer items-start gap-3 rounded-xl border p-4">
+                <input
+                  type="checkbox"
+                  checked={draft.allowCustomProposal}
+                  onChange={(e) => patch({ allowCustomProposal: e.target.checked })}
+                  className="accent-brass mt-1 h-4 w-4 shrink-0"
+                />
+                <span>
+                  <span className="text-parchment block">Eigener Vorschlag erlaubt</span>
+                  <span className="text-fog block text-sm">
+                    Dein Besuch darf eine eigene Unternehmung und einen eigenen Tag samt
+                    Uhrzeit eintragen — auch ausserhalb deiner Zeitfenster. Du erfährst es
+                    in der Zusage-E-Mail.
+                  </span>
+                </span>
+              </label>
             </div>
           )}
 
@@ -383,7 +431,11 @@ export function CreateWizard() {
             <div className="space-y-6">
               <Heading
                 title="Wann hättest du Zeit?"
-                sub="Nur diese Fenster stehen deinem Besuch zur Wahl."
+                sub={
+                  draft.allowCustomProposal
+                    ? 'Diese Fenster schlägst du vor — dein Besuch darf auch einen eigenen Termin nennen.'
+                    : 'Nur diese Fenster stehen deinem Besuch zur Wahl.'
+                }
               />
               <SlotPicker
                 slots={draft.slots}
@@ -396,29 +448,7 @@ export function CreateWizard() {
           {step === 5 && (
             <div className="space-y-6">
               <Heading title="Sieht das gut aus?" />
-              <dl className="space-y-4">
-                <Row label="Für">{draft.recipientName}</Row>
-                <Row label="Kombination">
-                  <span className="tnum text-brass-bright text-xl tracking-[0.3em]">
-                    {pinFor(draft.puzzles)}
-                  </span>
-                  <span className="text-fog-dim mt-1 block text-sm">
-                    Ergibt sich aus deinen {draft.puzzles.length} Rätseln. Du musst sie
-                    dir nicht merken.
-                  </span>
-                </Row>
-                <Row label="Rätsel">{draft.puzzles.map((p) => p.title).join(' · ')}</Row>
-                <Row label="Zur Auswahl">
-                  {draft.options.map((o) => o.label).join(' · ')}
-                </Row>
-                <Row label="Zeitfenster">
-                  {draft.slots.map((s) => (
-                    <span key={`${s.day}${s.from}`} className="block">
-                      {formatDay(s.day, draft.timezone)}, {s.from}–{s.to}
-                    </span>
-                  ))}
-                </Row>
-              </dl>
+              <Summary draft={draft} />
               <p className="text-fog-dim text-sm">
                 Inhalte lassen sich später nicht mehr ändern. Jetzt ist der Moment.
               </p>
@@ -446,6 +476,27 @@ export function CreateWizard() {
                 onChange={(e) => patch({ creatorEmail: e.target.value })}
                 placeholder="du@beispiel.ch"
               />
+              {/* Die Kombination steht in dieser Zusammenfassung. Wer sein
+                  Postfach mit anderen teilt, will genau das nicht. */}
+              <label className="border-steel-600/70 flex cursor-pointer items-start gap-3 rounded-xl border p-4">
+                <input
+                  type="checkbox"
+                  checked={draft.emailSummary}
+                  onChange={(e) => patch({ emailSummary: e.target.checked })}
+                  className="accent-brass mt-1 h-4 w-4 shrink-0"
+                />
+                <span>
+                  <span className="text-parchment block">
+                    Zusammenfassung mitschicken
+                  </span>
+                  <span className="text-fog block text-sm">
+                    Deine Angaben samt Kombination stehen dann auch in der
+                    Bestätigungsmail. Auf dem nächsten Bildschirm siehst du sie so oder
+                    so.
+                  </span>
+                </span>
+              </label>
+
               <p className="text-fog-dim text-sm">
                 Wir nutzen die Adresse nur für diesen Tresor. Nach 90 Tagen wird alles
                 gelöscht.
@@ -536,6 +587,61 @@ function Heading({ title, sub }: { title: string; sub?: string }) {
       </h1>
       {sub && <p className="text-fog mt-2">{sub}</p>}
     </header>
+  )
+}
+
+/**
+ * Alles, was der Ersteller eingetragen hat, an einem Ort — vor dem Abschicken
+ * als Kontrolle, danach als Beleg. Beide Male dieselben Zeilen, damit die
+ * Vorschau nicht das eine und die Bestätigung das andere zeigt.
+ */
+function Summary({ draft }: { draft: Draft }) {
+  return (
+    <dl className="space-y-4">
+      <Row label="Für">{draft.recipientName}</Row>
+      <Row label="Kombination">
+        <span className="tnum text-brass-bright text-xl tracking-[0.3em]">
+          {pinFor(draft.puzzles)}
+        </span>
+        <span className="text-fog-dim mt-1 block text-sm">
+          Ergibt sich aus deinen {draft.puzzles.length} Rätseln. Du musst sie dir nicht
+          merken.
+        </span>
+      </Row>
+      <Row label="Rätsel">
+        {draft.puzzles.map((p, i) => (
+          <span key={p.id} className="block">
+            <span className="tnum text-brass-dim">{p.digit}</span> —{' '}
+            {p.title || `Rätsel ${i + 1}`}
+          </span>
+        ))}
+      </Row>
+      <Row label="Zur Auswahl">
+        {draft.options.map((o) => o.label).join(' · ')}
+        <span className="text-fog-dim mt-1 block text-sm">
+          {draft.allowCustomProposal
+            ? 'Eigener Vorschlag erlaubt — Unternehmung und Zeitpunkt frei.'
+            : 'Nur diese Möglichkeiten, kein eigener Vorschlag.'}
+        </span>
+      </Row>
+      <Row label="Zeitfenster">
+        {draft.slots.map((s) => (
+          <span key={`${s.day}${s.from}`} className="block">
+            {formatDay(s.day, draft.timezone)}, {s.from}–{s.to}
+          </span>
+        ))}
+        <span className="text-fog-dim mt-1 block text-sm">{draft.timezone}</span>
+      </Row>
+      <Row label="Im Tresor">
+        <span className="block whitespace-pre-line">{draft.revealText}</span>
+        {draft.closingText && (
+          <span className="text-fog mt-2 block text-right italic">
+            {draft.closingText}
+          </span>
+        )}
+      </Row>
+      {draft.creatorEmail && <Row label="Antwort an">{draft.creatorEmail}</Row>}
+    </dl>
   )
 }
 

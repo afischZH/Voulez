@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { hashToken } from '@/lib/crypto'
 import { env } from '@/lib/env'
 import { db } from '@/lib/supabase/server'
+import { formatDay } from '@/lib/time'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +24,7 @@ export default async function ConfirmPage({ searchParams }: PageProps<'/bestaeti
 
   const { data: vault } = await db()
     .from('vaults')
-    .select('id, slug, status, recipient_name')
+    .select('id, slug, status, recipient_name, creator_name, creator_email, timezone')
     .eq('confirm_token_hash', hashToken(value))
     .maybeSingle()
 
@@ -50,6 +51,18 @@ export default async function ConfirmPage({ searchParams }: PageProps<'/bestaeti
 
   const shareUrl = `${env.siteUrl}/v/${vault.slug}`
 
+  // Was der Tresor enthält, steht ab jetzt nur noch in der Datenbank: der
+  // Entwurf im Browser ist beim Abschicken gelöscht worden.
+  const [{ data: options }, { data: slots }] = await Promise.all([
+    db().from('date_options').select('label').eq('vault_id', vault.id).order('position'),
+    db()
+      .from('date_slots')
+      .select('day,time_from,time_to')
+      .eq('vault_id', vault.id)
+      .order('day')
+      .order('time_from'),
+  ])
+
   return (
     <main className="flex flex-1 flex-col items-center px-6 py-20">
       <div className="my-auto w-full max-w-lg text-center">
@@ -68,6 +81,24 @@ export default async function ConfirmPage({ searchParams }: PageProps<'/bestaeti
           <p className="text-brass-bright mt-2 font-mono text-sm break-all">{shareUrl}</p>
         </div>
 
+        <dl className="border-steel-700 mt-8 space-y-4 border-t pt-8 text-left">
+          <Row label="Für">{vault.recipient_name}</Row>
+          <Row label="Von">{vault.creator_name ?? vault.creator_email}</Row>
+          <Row label="Zur Auswahl">
+            {(options ?? []).map((o) => o.label).join(' · ') || '—'}
+          </Row>
+          <Row label="Zeitfenster">
+            {(slots ?? []).map((s) => (
+              <span key={`${s.day}${s.time_from}`} className="block">
+                {formatDay(s.day, vault.timezone)}, {s.time_from.slice(0, 5)}–
+                {s.time_to.slice(0, 5)}
+              </span>
+            ))}
+            <span className="text-fog-dim mt-1 block text-sm">{vault.timezone}</span>
+          </Row>
+          <Row label="Antwort an">{vault.creator_email}</Row>
+        </dl>
+
         <p className="text-fog-dim mt-6 text-sm">
           Den Verwaltungslink findest du in derselben E-Mail. Heb sie auf — er lässt sich
           nicht wiederherstellen.
@@ -83,6 +114,15 @@ export default async function ConfirmPage({ searchParams }: PageProps<'/bestaeti
         </div>
       </div>
     </main>
+  )
+}
+
+function Row({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="border-steel-700 border-b pb-4">
+      <dt className="text-2xs text-fog-dim tracking-[0.22em] uppercase">{label}</dt>
+      <dd className="text-parchment mt-1.5">{children}</dd>
+    </div>
   )
 }
 

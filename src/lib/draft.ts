@@ -23,6 +23,14 @@ export const draftSchema = z.object({
   closingText: z.string().trim().max(200),
   creatorName: z.string().trim().max(60),
   creatorEmail: z.email(),
+  /** Ob die Bestätigungsmail eine Kopie der Angaben tragen soll. Der Wizard
+   *  zeigt sie ohnehin an — mancher will sie zusätzlich im Postfach, mancher
+   *  will die PIN nirgends stehen haben. */
+  emailSummary: z.boolean().default(true),
+  /** Ob der Besuch auch etwas Eigenes vorschlagen darf — eine andere
+   *  Unternehmung, einen Termin ausserhalb der angebotenen Fenster. Die
+   *  Auswahl des Erstellers bleibt daneben bestehen. */
+  allowCustomProposal: z.boolean().default(false),
   timezone: z.string().max(64).default('Europe/Zurich'),
   puzzles: z.array(draftPuzzleSchema).min(2).max(6),
   options: z
@@ -70,6 +78,8 @@ export const EMPTY_DRAFT: Draft = {
   closingText: '',
   creatorName: '',
   creatorEmail: '',
+  emailSummary: true,
+  allowCustomProposal: false,
   timezone: 'Europe/Zurich',
   puzzles: [],
   options: [],

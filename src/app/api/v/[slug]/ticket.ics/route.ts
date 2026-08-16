@@ -19,7 +19,7 @@ export async function GET(
 
   const { data: response } = await db()
     .from('responses')
-    .select('id,accepted,starts_at,duration_min,created_at,option_id')
+    .select('id,accepted,starts_at,duration_min,created_at,option_id,custom_label')
     .eq('vault_id', vault.id)
     .maybeSingle()
 
@@ -33,7 +33,8 @@ export async function GET(
         .maybeSingle()
     : { data: null }
 
-  const title = option?.label ?? 'Unternehmung'
+  // Ohne Option steht dort der eigene Vorschlag des Besuchs.
+  const title = option?.label ?? response.custom_label ?? 'Unternehmung'
 
   const ics = buildIcs({
     uid: `${response.id}@voulez`,

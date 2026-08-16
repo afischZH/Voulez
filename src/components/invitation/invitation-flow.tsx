@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Ticket, type TicketData } from '@/components/invitation/ticket'
+import { TicketMailer } from '@/components/invitation/ticket-mailer'
 import { formatDay, slotTimes } from '@/lib/time'
 import type { LockedVault, OpenedVault } from '@/lib/vault'
 
@@ -32,8 +33,13 @@ export function InvitationFlow({
   const lively = emerge && !still
   const [stage, setStage] = useState<Stage>('reveal')
   const [optionId, setOptionId] = useState<string | null>(null)
+  /** Gesetzt, wenn der Besuch etwas Eigenes vorschlägt statt zu wählen. */
+  const [customLabel, setCustomLabel] = useState<string | null>(null)
+  const [ownIdea, setOwnIdea] = useState('')
   const [day, setDay] = useState<string | null>(null)
   const [time, setTime] = useState<string | null>(null)
+  /** Termin frei eintragen statt aus den Fenstern wählen. */
+  const [ownWhen, setOwnWhen] = useState(false)
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +49,18 @@ export function InvitationFlow({
     () => [...new Set(opened.slots.map((s) => s.day))].sort(),
     [opened.slots],
   )
+
+  /** Was gewählt wurde — eine der Karten oder der eigene Vorschlag. */
+  const chosenLabel =
+    customLabel ?? opened.options.find((o) => o.id === optionId)?.label ?? null
+
+  // Als Untergrenze des Datumsfelds. Lokal gerechnet, nicht über `toISOString`:
+  // das rechnet nach UTC und liegt abends einen Tag daneben.
+  const [today] = useState(() => {
+    const now = new Date()
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`
+  })
 
   const times = useMemo(() => {
     if (!day) return []
@@ -63,7 +81,9 @@ export function InvitationFlow({
         accepted
           ? {
               accepted: true,
-              optionId,
+              // Entweder das eine oder das andere — der Server weist beides
+              // zusammen zurück.
+              ...(customLabel ? { customLabel } : { optionId }),
               day,
               time,
               durationMin: 120,
@@ -195,6 +215,7 @@ export function InvitationFlow({
                     type="button"
                     onClick={() => {
                       setOptionId(option.id)
+                      setCustomLabel(null)
                       setStage('when')
                     }}
                     aria-pressed={optionId === option.id}
@@ -214,6 +235,46 @@ export function InvitationFlow({
                 </li>
               ))}
             </ul>
+
+            {/* Nur wenn der Gastgeber es zugelassen hat: etwas nennen, das
+                nicht auf den Karten steht. */}
+            {opened.allowCustomProposal && (
+              <form
+                className="border-steel-600/70 mt-6 rounded-xl border border-dashed p-5"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  const own = ownIdea.trim()
+                  if (!own) return
+                  setCustomLabel(own)
+                  setOptionId(null)
+                  setStage('when')
+                }}
+              >
+                <label
+                  htmlFor="own-idea"
+                  className="text-2xs text-fog-dim tracking-[0.22em] uppercase"
+                >
+                  Oder etwas ganz anderes
+                </label>
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    id="own-idea"
+                    value={ownIdea}
+                    onChange={(event) => setOwnIdea(event.target.value)}
+                    maxLength={60}
+                    placeholder="Konzert, Kochen, Velotour …"
+                    className="border-steel-600/70 bg-steel-900/60 text-parchment placeholder:text-fog-dim min-w-0 flex-1 rounded-lg border px-4 py-2.5"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!ownIdea.trim()}
+                    className="border-brass/70 text-brass-bright hover:bg-brass/16 rounded-lg border px-5 py-2.5 transition-colors disabled:opacity-40"
+                  >
+                    Weiter
+                  </button>
+                </div>
+              </form>
+            )}
           </motion.section>
         )}
 
@@ -221,55 +282,122 @@ export function InvitationFlow({
           <motion.section key="when" {...fade} className="w-full max-w-xl">
             <StepHeading step={2} title="Wann passt es dir?" />
 
-            <div className="mt-6">
-              <h3 className="text-2xs text-fog-dim tracking-[0.25em] uppercase">Tag</h3>
-              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-                {days.map((candidate) => (
-                  <li key={candidate}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDay(candidate)
-                        setTime(null)
-                      }}
-                      aria-pressed={day === candidate}
-                      className={`w-full rounded-lg border px-4 py-3 text-left transition-colors ${
-                        day === candidate
-                          ? 'border-brass bg-brass/12 text-brass-bright'
-                          : 'border-steel-600/70 bg-steel-900/60 hover:border-brass/50'
-                      }`}
-                    >
-                      {formatDay(candidate, opened.timezone)}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <p className="text-fog mt-3 text-center text-sm">
+              {chosenLabel && <>Für: {chosenLabel}</>}
+            </p>
 
-            {day && (
-              <div className="mt-7">
-                <h3 className="text-2xs text-fog-dim tracking-[0.25em] uppercase">
-                  Uhrzeit
-                </h3>
-                <ul className="mt-3 flex flex-wrap gap-2">
-                  {times.map((candidate) => (
-                    <li key={candidate}>
-                      <button
-                        type="button"
-                        onClick={() => setTime(candidate)}
-                        aria-pressed={time === candidate}
-                        className={`tnum rounded-lg border px-4 py-2.5 transition-colors ${
-                          time === candidate
-                            ? 'border-brass bg-brass/16 text-brass-bright'
-                            : 'border-steel-600/70 bg-steel-900/60 hover:border-brass/50'
-                        }`}
-                      >
-                        {candidate}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+            {ownWhen ? (
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <label
+                    htmlFor="own-day"
+                    className="text-2xs text-fog-dim tracking-[0.25em] uppercase"
+                  >
+                    Tag
+                  </label>
+                  <input
+                    id="own-day"
+                    type="date"
+                    value={day ?? ''}
+                    min={today}
+                    onChange={(event) => setDay(event.target.value || null)}
+                    className="border-steel-600/70 bg-steel-900/60 text-parchment tnum mt-3 w-full rounded-lg border px-4 py-3"
+                  />
+                </div>
+                <div>
+                  <label
+                    htmlFor="own-time"
+                    className="text-2xs text-fog-dim tracking-[0.25em] uppercase"
+                  >
+                    Uhrzeit
+                  </label>
+                  <input
+                    id="own-time"
+                    type="time"
+                    value={time ?? ''}
+                    step={300}
+                    onChange={(event) => setTime(event.target.value || null)}
+                    className="border-steel-600/70 bg-steel-900/60 text-parchment tnum mt-3 w-full rounded-lg border px-4 py-3"
+                  />
+                </div>
+                <p className="text-fog-dim text-sm sm:col-span-2">
+                  Die Uhrzeit gilt in {opened.timezone}. Liegt der Termin ausserhalb der
+                  vorgeschlagenen Fenster, steht das in der Zusage —{' '}
+                  {opened.hostName ?? 'dein Gastgeber'} erfährt es also.
+                </p>
               </div>
+            ) : (
+              <>
+                <div className="mt-6">
+                  <h3 className="text-2xs text-fog-dim tracking-[0.25em] uppercase">
+                    Tag
+                  </h3>
+                  <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {days.map((candidate) => (
+                      <li key={candidate}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDay(candidate)
+                            setTime(null)
+                          }}
+                          aria-pressed={day === candidate}
+                          className={`w-full rounded-lg border px-4 py-3 text-left transition-colors ${
+                            day === candidate
+                              ? 'border-brass bg-brass/12 text-brass-bright'
+                              : 'border-steel-600/70 bg-steel-900/60 hover:border-brass/50'
+                          }`}
+                        >
+                          {formatDay(candidate, opened.timezone)}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {day && (
+                  <div className="mt-7">
+                    <h3 className="text-2xs text-fog-dim tracking-[0.25em] uppercase">
+                      Uhrzeit
+                    </h3>
+                    <ul className="mt-3 flex flex-wrap gap-2">
+                      {times.map((candidate) => (
+                        <li key={candidate}>
+                          <button
+                            type="button"
+                            onClick={() => setTime(candidate)}
+                            aria-pressed={time === candidate}
+                            className={`tnum rounded-lg border px-4 py-2.5 transition-colors ${
+                              time === candidate
+                                ? 'border-brass bg-brass/16 text-brass-bright'
+                                : 'border-steel-600/70 bg-steel-900/60 hover:border-brass/50'
+                            }`}
+                          >
+                            {candidate}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+
+            {opened.allowCustomProposal && (
+              <button
+                type="button"
+                onClick={() => {
+                  // Die Auswahl aus dem einen Modus passt nie in den anderen.
+                  setOwnWhen((was) => !was)
+                  setDay(null)
+                  setTime(null)
+                }}
+                className="text-fog hover:text-brass mt-5 text-sm underline underline-offset-4"
+              >
+                {ownWhen
+                  ? '← Doch aus den vorgeschlagenen Zeiten wählen'
+                  : 'Keine dieser Zeiten? Eigenen Termin eintragen'}
+              </button>
             )}
 
             <div className="mt-7">
@@ -337,6 +465,8 @@ export function InvitationFlow({
                 Drucken
               </button>
             </div>
+
+            <TicketMailer slug={slug} />
           </motion.section>
         )}
 

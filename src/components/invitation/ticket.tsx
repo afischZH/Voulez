@@ -1,6 +1,6 @@
 'use client'
 
-import { formatDateTime } from '@/lib/time'
+import { formatDateTime, formatDuration } from '@/lib/time'
 
 export type TicketData = {
   slug: string
@@ -36,10 +36,17 @@ export function Ticket({ data }: { data: TicketData }) {
 
           <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 text-sm">
             <Field label="Tag">{weekday}</Field>
-            <Field label="Datum & Zeit">{rest.join(', ')}</Field>
+            <Field label="Datum & Zeit">
+              {rest.join(', ')}
+              {/* Die Zeit gilt in der Zone des Erstellers — ohne diese Zeile
+                  rät ein Besucher aus einem anderen Land. */}
+              <span className="text-fog-dim mt-0.5 block text-xs print:text-black">
+                {data.timezone}
+              </span>
+            </Field>
             <Field label="Für">{data.recipientName}</Field>
             <Field label="Mit">{data.hostName ?? '—'}</Field>
-            <Field label="Dauer">ca. {Math.round(data.durationMin / 60)} h</Field>
+            <Field label="Dauer">ca. {formatDuration(data.durationMin)}</Field>
             <Field label="Status">Bestätigt</Field>
           </dl>
 

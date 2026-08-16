@@ -36,6 +36,8 @@ export type OpenedVault = {
   timezone: string
   options: { id: string; label: string; icon: string; description: string | null }[]
   slots: { day: string; from: string; to: string }[]
+  /** Ob neben der Auswahl auch ein eigener Vorschlag zugelassen ist. */
+  allowCustomProposal: boolean
   alreadyAnswered: boolean
 }
 
@@ -127,6 +129,7 @@ export async function openedView(vault: VaultRow): Promise<OpenedVault> {
       from: s.time_from,
       to: s.time_to,
     })),
+    allowCustomProposal: vault.allow_custom_proposal,
     alreadyAnswered: Boolean(answer),
   }
 }

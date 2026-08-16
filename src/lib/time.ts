@@ -63,6 +63,18 @@ export function formatDay(day: string, timeZone: string): string {
   }).format(zonedToUtc(day, '12:00', timeZone))
 }
 
+/**
+ * Dauer in Worten. Bewusst hier und nicht im Ticket: dieselbe Angabe steht
+ * auf dem Bildschirm und in der Bestätigungsmail, und zwei Formatierungen
+ * derselben Zahl fallen dem Empfänger sofort als Widerspruch auf.
+ */
+export function formatDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} Minuten`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest ? `${hours} h ${rest} min` : `${hours} h`
+}
+
 export function formatDateTime(iso: string, timeZone: string): string {
   return new Intl.DateTimeFormat('de-CH', {
     weekday: 'long',

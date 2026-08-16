@@ -1,12 +1,13 @@
 import { customAlphabet } from 'nanoid'
 import { hashPin, hashToken, newToken } from '@/lib/crypto'
-import { draftSchema, pinFor } from '@/lib/draft'
+import { draftSchema, pinFor, type Draft } from '@/lib/draft'
 import { env } from '@/lib/env'
-import { errors, ok } from '@/lib/http'
+import { errors, fail, ok } from '@/lib/http'
 import { send } from '@/lib/mail'
 import { puzzleFor } from '@/lib/puzzles'
 import { allow, clientFingerprint, LIMITS } from '@/lib/rate-limit'
 import { db } from '@/lib/supabase/server'
+import { formatDay } from '@/lib/time'
 
 // Ohne Vokale und ohne verwechselbare Zeichen — der Link wird auch mal
 // abgetippt oder vorgelesen.
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
       reveal_text: draft.data.revealText,
       closing_text: draft.data.closingText || null,
       timezone: draft.data.timezone,
+      allow_custom_proposal: draft.data.allowCustomProposal,
       // Erst nach dem Klick in der E-Mail wird der Tresor spielbar. Ohne diese
       // Sperre könnte man fremde Adressen eintragen und die Seite als
       // Versandwerkzeug missbrauchen.
@@ -115,7 +117,7 @@ export async function POST(request: Request) {
     return errors.badRequest('Der Tresor konnte nicht angelegt werden.')
   }
 
-  await send({
+  const mail = await send({
     to: draft.data.creatorEmail,
     subject: `Bestätige deinen Tresor für ${draft.data.recipientName}`,
     text: [
@@ -126,13 +128,61 @@ export async function POST(request: Request) {
       `Danach bekommst du den Link zum Teilen und einen Verwaltungslink.`,
       `Hebe diese E-Mail auf — der Verwaltungslink steht nur hier:`,
       `${env.siteUrl}/verwalten?token=${editToken}`,
+      ...(draft.data.emailSummary ? summaryLines(draft.data) : []),
       '',
       `Wenn du das nicht warst, ignoriere diese Nachricht. Ohne Bestätigung`,
       `wird der Tresor nie sichtbar und nach 90 Tagen gelöscht.`,
     ].join('\n'),
   })
 
+  // Diese eine Mail darf nicht stillschweigend scheitern. Sie trägt die
+  // beiden einzigen Tokens, die es je geben wird: ohne sie ist der Tresor
+  // ein Entwurf, den niemand mehr bestätigen und niemand mehr verwalten
+  // kann. Ein "Schau in dein Postfach" auf eine Nachricht, die nie kommt,
+  // ist schlimmer als ein ehrlicher Fehler — also zurückrollen.
+  if (!mail.ok) {
+    console.error('Bestätigungsmail nicht zustellbar, rolle Tresor zurück', mail)
+    await db().from('vaults').delete().eq('id', vault.id)
+    return fail(
+      502,
+      'mail_failed',
+      mail.reason === 'not_configured'
+        ? 'Der E-Mail-Versand ist auf diesem Server nicht eingerichtet. Der Tresor wurde nicht angelegt.'
+        : 'Die Bestätigungsmail liess sich nicht zustellen. Prüf die Adresse und versuch es nochmal.',
+    )
+  }
+
   // Der Slug bleibt bis zur Bestätigung geheim — sonst liesse sich ein
   // unbestätigter Link teilen.
   return ok({ created: true, email: draft.data.creatorEmail })
+}
+
+/**
+ * Die Angaben als Klartext-Block für die Bestätigungsmail — dieselben Zeilen,
+ * die der Wizard nach dem Abschicken anzeigt. Enthält die Kombination, steht
+ * deshalb nur auf Wunsch in der Mail.
+ */
+function summaryLines(draft: Draft): string[] {
+  return [
+    '',
+    '— Deine Angaben —',
+    '',
+    `Für:         ${draft.recipientName}`,
+    `Kombination: ${pinFor(draft.puzzles)}`,
+    `Rätsel:      ${draft.puzzles.map((p, i) => `${p.digit} — ${p.title || `Rätsel ${i + 1}`}`).join('\n             ')}`,
+    `Zur Auswahl: ${draft.options.map((o) => o.label).join(' · ')}`,
+    `Eigener Vorschlag: ${
+      draft.allowCustomProposal
+        ? 'erlaubt — Unternehmung und Zeitpunkt frei'
+        : 'nicht erlaubt'
+    }`,
+    `Zeitfenster: ${draft.slots
+      .map((s) => `${formatDay(s.day, draft.timezone)}, ${s.from}–${s.to}`)
+      .join('\n             ')}`,
+    `Zeitzone:    ${draft.timezone}`,
+    '',
+    'Im Tresor steht:',
+    draft.revealText,
+    draft.closingText ? `\n${draft.closingText}` : '',
+  ]
 }
