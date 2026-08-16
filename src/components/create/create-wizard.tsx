@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { TextArea, TextInput } from '@/components/create/fields'
 import {
@@ -46,6 +46,8 @@ export function CreateWizard() {
   const [sent, setSent] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [restored, setRestored] = useState(false)
+  /** Läuft gerade ein Absenden? Als Ref, weil die Sperre sofort gelten muss. */
+  const sending = useRef(false)
 
   // Ein halb fertiger Tresor darf einen Tab-Wechsel überleben — ohne Login
   // gibt es sonst keinen Ort, an dem er läge.
@@ -92,20 +94,47 @@ export function CreateWizard() {
 
   const blocker = validate(step, draft)
 
+  /**
+   * Ein Schritt weiter — die Prüfung steckt im Updater, nicht nur im
+   * `disabled` des Knopfes. Zwei schnelle Klicks landen in derselben
+   * React-Aktualisierung: der zweite läuft, bevor `disabled` neu gerendert
+   * ist, und übersprang so eine ganze Stufe (mit null Rätseln auf „Der
+   * Hinweis"). Hier sieht der zweite Aufruf den bereits erhöhten Schritt.
+   */
+  function goNext() {
+    setStep((current) => {
+      if (current >= STEPS.length - 1) return current
+      return validate(current, draft) ? current : current + 1
+    })
+  }
+
   async function submit() {
+    // `busy` allein reicht nicht: es wirkt erst nach dem nächsten Rendern,
+    // zwei schnelle Klicks lägen davor. Ein zweiter Tresor samt zweiter
+    // Bestätigungsmail wäre die Folge.
+    if (sending.current) return
+    sending.current = true
     setBusy(true)
     setError(null)
-    const res = await fetch('/api/vaults', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(draft),
-    })
-    const json = await res.json().catch(() => ({}))
-    setBusy(false)
 
-    if (!res.ok) return setError(json.message ?? 'Das hat nicht geklappt.')
-    localStorage.removeItem(STORAGE_KEY)
-    setSent(json.email ?? draft.creatorEmail)
+    try {
+      const res = await fetch('/api/vaults', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(draft),
+      })
+      const json = await res.json().catch(() => ({}))
+
+      if (!res.ok) return setError(json.message ?? 'Das hat nicht geklappt.')
+      localStorage.removeItem(STORAGE_KEY)
+      setSent(json.email ?? draft.creatorEmail)
+    } catch {
+      // Ohne Netz bliebe der Knopf sonst für immer bei „Einen Moment…".
+      setError('Keine Verbindung. Versuch es gleich nochmal.')
+    } finally {
+      setBusy(false)
+      sending.current = false
+    }
   }
 
   if (sent) {
@@ -525,7 +554,7 @@ export function CreateWizard() {
             <button
               type="button"
               disabled={Boolean(blocker)}
-              onClick={() => setStep((s) => s + 1)}
+              onClick={goNext}
               className="border-brass bg-brass/16 text-brass-bright hover:bg-brass/26 rounded-lg border px-7 py-3 transition-all hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-40"
             >
               Weiter
