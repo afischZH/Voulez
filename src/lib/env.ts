@@ -27,11 +27,11 @@ export const env = {
   get sessionSecret() {
     return required('SESSION_SECRET')
   },
-  get resendApiKey() {
-    return required('RESEND_API_KEY')
+  get plunkApiKey() {
+    return required('PLUNK_API_KEY')
   },
   get mailFrom() {
-    return process.env.MAIL_FROM ?? 'Voulez <onboarding@resend.dev>'
+    return process.env.MAIL_FROM ?? 'Voulez <post@voulez.love>'
   },
   /** Wohin Missbrauchsmeldungen gehen. */
   get reportTo() {

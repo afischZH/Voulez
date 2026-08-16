@@ -68,7 +68,7 @@ export default function PrivacyPage() {
           Auftragsverarbeiter für die Speicherung.
         </li>
         <li>
-          <strong>Resend</strong> — Auftragsverarbeiter für den E-Mail-Versand.
+          <strong>Plunk</strong> — Auftragsverarbeiter für den E-Mail-Versand.
         </li>
         <li>
           <strong>Vercel</strong> — Auftragsverarbeiter für den Betrieb der Website.

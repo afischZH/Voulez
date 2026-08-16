@@ -36,10 +36,86 @@ npm run dev
 | `SUPABASE_URL` | Supabase → Project Settings → API |
 | `SUPABASE_SERVICE_ROLE_KEY` | dieselbe Seite, „secret". Umgeht RLS — nie in den Client, nie ins Repo |
 | `SESSION_SECRET` | `node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"` |
-| `RESEND_API_KEY` | resend.com → API Keys. Ohne Key werden Mails nur in die Server-Logs geschrieben |
+| `PLUNK_API_KEY` | useplunk.com → Project settings → API keys, der geheime `sk_`-Key. Ohne Key werden Mails nur in die Server-Logs geschrieben |
 | `MAIL_FROM` | verifizierte Absenderadresse |
 | `REPORT_TO` | wohin Missbrauchsmeldungen gehen |
 | `SITE_URL` | Basis-URL für Links in E-Mails |
+| `CRON_SECRET` | schützt den täglichen Aufräum-Lauf, gleiche Erzeugung wie `SESSION_SECRET` |
+
+### E-Mail-Versand: Plunk mit voulez.love
+
+Die Domain liegt bei Infomaniak (`ns11/ns12.infomaniak.ch`), verschickt wird
+über Plunk. Zu verifizieren ist die Wurzel `voulez.love`.
+
+1. Plunk → **Project settings → Domains → Add domain** → `voulez.love`.
+2. Die angezeigten Einträge in die Infomaniak-DNS-Zone übertragen (Manager →
+   Domains → voulez.love → **DNS-Zone**). Ins Feld „Quelle" gehört **nur der
+   Teil vor der Domain**, Infomaniak hängt `voulez.love` selbst an:
+
+   | Typ | Zweck |
+   |---|---|
+   | CNAME ×3 | DKIM-Signatur |
+   | TXT | SPF |
+   | MX | Bounce- und Beschwerde-Rückläufer |
+   | TXT auf `_dmarc` | `v=DMARC1; p=none;` (optional, aber empfohlen) |
+
+   Namen und Werte sind kontospezifisch — immer aus dem Dashboard kopieren.
+   **SPF gibt es nur einmal pro Domain**: existiert schon ein Eintrag, das
+   `include:` von Plunk in den bestehenden hineinschreiben, statt einen
+   zweiten anzulegen. Zwei SPF-Einträge lassen beide fehlschlagen.
+3. In Plunk die Verifizierung anstossen. Meist ist sie in wenigen Minuten
+   durch, bei zähem DNS-Cache dauert es länger.
+4. `PLUNK_API_KEY` (der geheime `sk_`-Key — der öffentliche `pk_`-Key darf
+   `/v1/send` nicht) und `MAIL_FROM` in `.env.local` und beim Hoster
+   eintragen.
+
+Prüfen, ob die Einträge draussen angekommen sind (Namen aus dem Dashboard
+einsetzen):
+
+```bash
+dig +short TXT voulez.love; dig +short MX voulez.love
+```
+
+Ohne `PLUNK_API_KEY` läuft alles weiter, nur landen die Mails im Server-Log
+statt im Postfach — sichtbar an der Zeile `[mail] nicht verschickt an …`.
+Ein Tresor wird in dem Fall bewusst **nicht** angelegt: die Bestätigungsmail
+trägt die einzigen beiden Tokens, die es je gibt.
+
+### Aufräumen nach 90 Tagen
+
+Die Datenschutzerklärung sagt zu, dass ein Tresor 90 Tage nach der Erstellung
+verschwindet — samt Rätseln, Antwort und E-Mail-Adresse. Eingelöst wird das
+vom täglichen Lauf `/api/cron/cleanup`, in drei Schritten:
+
+| Was | Frist | Wie |
+|---|---|---|
+| Tresore | `expires_at`, also 90 Tage ab Erstellung | ein `DELETE`; Rätsel, Termine, Antwort und Ereignisse hängen mit `ON DELETE CASCADE` daran |
+| Rate-Limit-Zeilen | 7 Tage | enthalten IP-Hashes; das längste Zählfenster ist ein Tag |
+| Plunk-Kontakte | 90 Tage | höchstens 200 pro Lauf |
+
+Die Adresse des Besuchers wartet nicht auf diesen Lauf — ihr Kontakt wird
+direkt nach dem Ticket gelöscht.
+
+Der Zeitplan steht in `vercel.json`; Vercel richtet den Cron beim nächsten
+Deploy ein und schickt `CRON_SECRET` als Bearer-Token mit. Die Variable muss
+also auch beim Hoster gesetzt sein — fehlt sie, antwortet der Endpunkt mit
+503 und räumt nichts weg. Von Hand anstossen:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" https://voulez.love/api/cron/cleanup
+```
+
+Die Antwort zählt, was passiert ist:
+
+```json
+{"vaults":2,"rateLimits":140,"contacts":{"deleted":3,"failed":0,"more":false}}
+```
+
+Ein Schritt, der scheitert, hält die anderen nicht auf; er steht dann als
+`null` da und mit seinem Grund unter `failures`. `more: true` heisst, dass
+der Deckel von 200 Kontakten erreicht war — der nächste Tag macht weiter.
+Das Plunk-Projekt sollte Voulez allein gehören: der Lauf löscht jeden
+Kontakt, der älter als 90 Tage ist, ohne zu fragen, wer ihn angelegt hat.
 
 `SESSION_SECRET` darf nach dem ersten Livegang nicht mehr geändert werden —
 es leitet die Memory-Kartenbilder ab. Ein neues Secret mischt laufende
