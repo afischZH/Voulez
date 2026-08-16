@@ -75,6 +75,10 @@ body {
     transparent 60%
   );
   background-attachment: fixed;
+  /* Der Lichtschein um den Tresor ragt bewusst über die Tür hinaus. `clip`
+     statt `hidden`: es schneidet ab, ohne einen Scroll-Container zu bauen —
+     `position: fixed` und `sticky` bleiben damit intakt. */
+  overflow-x: clip;
 }
 
 /* Zahlen laufen immer tabellarisch — Dial, PIN und Ticket dürfen nicht

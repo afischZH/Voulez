@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Ticket, type TicketData } from '@/components/invitation/ticket'
 import { formatDay, slotTimes } from '@/lib/time'
 import type { LockedVault, OpenedVault } from '@/lib/vault'
@@ -19,11 +19,17 @@ export function InvitationFlow({
   slug,
   vault,
   opened,
+  emerge = false,
 }: {
   slug: string
   vault: LockedVault
   opened: OpenedVault
+  /** Kommt direkt aus der Öffnungsanimation — dann steigt der Text aus dem
+      Tresor auf, statt einfach da zu sein. */
+  emerge?: boolean
 }) {
+  const still = useReducedMotion()
+  const lively = emerge && !still
   const [stage, setStage] = useState<Stage>('reveal')
   const [optionId, setOptionId] = useState<string | null>(null)
   const [day, setDay] = useState<string | null>(null)
@@ -91,7 +97,7 @@ export function InvitationFlow({
 
   if (opened.alreadyAnswered && stage === 'reveal') {
     return (
-      <Shell>
+      <Shell flash={lively}>
         <h1 className="font-display text-brass text-2xl tracking-wide">
           Schon beantwortet
         </h1>
@@ -103,26 +109,62 @@ export function InvitationFlow({
   }
 
   return (
-    <Shell>
+    <Shell flash={lively}>
       <AnimatePresence mode="wait">
         {stage === 'reveal' && (
-          <motion.section key="reveal" {...fade} className="w-full max-w-xl">
-            <p className="text-2xs text-brass-dim text-center tracking-[0.4em] uppercase">
+          <motion.section
+            key="reveal"
+            {...(lively ? {} : fade)}
+            className="w-full max-w-xl"
+            // Der Text kommt aus der Tiefe des Tresors auf den Leser zu.
+            style={lively ? { transformPerspective: 900 } : undefined}
+            initial={
+              lively
+                ? { opacity: 0, scale: 0.52, y: 84, rotateX: 14, filter: 'blur(16px)' }
+                : fade.initial
+            }
+            animate={
+              lively
+                ? { opacity: 1, scale: 1, y: 0, rotateX: 0, filter: 'blur(0px)' }
+                : fade.animate
+            }
+            transition={
+              lively
+                ? { duration: 1.25, delay: 0.12, ease: [0.16, 1, 0.3, 1] }
+                : fade.transition
+            }
+          >
+            <motion.p
+              className="text-2xs text-brass-dim text-center tracking-[0.4em] uppercase"
+              initial={lively ? { opacity: 0, letterSpacing: '1.4em' } : false}
+              animate={{ opacity: 1, letterSpacing: '0.4em' }}
+              transition={{ duration: lively ? 1.4 : 0, ease: [0.16, 1, 0.3, 1] }}
+            >
               Der Tresor ist offen
-            </p>
+            </motion.p>
 
             <div className="border-brass/30 bg-brass/6 mt-6 rounded-2xl border p-7 sm:p-9">
               {/* Bewusst NICHT font-display: Cinzel ist eine Gravurschrift.
                   Als Türschild grossartig, als mehrzeiliger Brief mühsam. */}
-              <p className="text-parchment text-lg leading-[1.75] whitespace-pre-line">
-                {opened.revealText}
-              </p>
+              <EmergingText text={opened.revealText} emerge={lively} />
               {opened.closingText && (
-                <p className="text-fog mt-6 text-right italic">{opened.closingText}</p>
+                <motion.p
+                  className="text-fog mt-6 text-right italic"
+                  initial={lively ? { opacity: 0, y: 12 } : false}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: lively ? 0.8 : 0, delay: lively ? 1.5 : 0 }}
+                >
+                  {opened.closingText}
+                </motion.p>
               )}
             </div>
 
-            <div className="mt-8 flex flex-col items-center gap-4">
+            <motion.div
+              className="mt-8 flex flex-col items-center gap-4"
+              initial={lively ? { opacity: 0, y: 16 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: lively ? 0.7 : 0, delay: lively ? 1.75 : 0 }}
+            >
               <button
                 type="button"
                 onClick={() => setStage('kind')}
@@ -138,7 +180,7 @@ export function InvitationFlow({
               >
                 Vielleicht ein andermal
               </button>
-            </div>
+            </motion.div>
           </motion.section>
         )}
 
@@ -312,13 +354,83 @@ export function InvitationFlow({
   )
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+function Shell({ children, flash }: { children: React.ReactNode; flash?: boolean }) {
   return (
     // Siehe vault-experience: `m-auto` zentriert, ohne bei hohem Inhalt
     // den oberen Rand abzuschneiden.
     <main className="flex flex-1 flex-col items-center px-5 py-14">
       <div className="my-auto flex w-full flex-col items-center">{children}</div>
+
+      {/* Übernimmt das Licht aus der Öffnungsanimation und blendet ab — der
+          Schnitt zwischen den beiden Bildschirmen bleibt dadurch unsichtbar. */}
+      {flash && (
+        <motion.div
+          aria-hidden
+          className="pointer-events-none fixed inset-0 z-50"
+          style={{
+            background:
+              'radial-gradient(circle at 50% 44%, var(--color-brass-bright) 0%, var(--color-brass) 30%, var(--color-brass-shadow) 58%, var(--color-ink) 82%)',
+          }}
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 0 }}
+          transition={{ duration: 1.15, ease: [0.4, 0, 0.2, 1] }}
+        />
+      )}
     </main>
+  )
+}
+
+/**
+ * Der persönliche Text steigt Wort für Wort aus dem Tresor auf: unscharf und
+ * klein aus der Tiefe, dann scharf auf Augenhöhe. Zeilenumbrüche des Autors
+ * bleiben erhalten, deshalb wird zuerst nach Zeilen und erst dann nach
+ * Wörtern getrennt.
+ */
+function EmergingText({ text, emerge }: { text: string; emerge: boolean }) {
+  if (!emerge) {
+    return (
+      <p className="text-parchment text-lg leading-[1.75] whitespace-pre-line">{text}</p>
+    )
+  }
+
+  // Der Zähler läuft über alle Zeilen hinweg, damit die Wörter in der
+  // Reihenfolge auftauchen, in der man sie liest.
+  let word = 0
+  const lines = text.split('\n').map((line) =>
+    line.split(/(\s+)/).map((chunk) => ({
+      chunk,
+      order: chunk.trim() ? word++ : -1,
+    })),
+  )
+
+  return (
+    <p className="text-parchment text-lg leading-[1.75]">
+      {lines.map((chunks, lineIndex) => (
+        <span key={lineIndex} className="block min-h-[1.75em]">
+          {chunks.map(({ chunk, order }, chunkIndex) =>
+            order < 0 ? (
+              <span key={chunkIndex}>{chunk}</span>
+            ) : (
+              <motion.span
+                key={chunkIndex}
+                className="inline-block"
+                initial={{ opacity: 0, y: 26, scale: 0.82, filter: 'blur(12px)' }}
+                animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+                transition={{
+                  duration: 0.85,
+                  // Gedeckelt, damit ein langer Brief nicht minutenlang
+                  // aufsteigt.
+                  delay: 0.5 + Math.min(order, 44) * 0.042,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
+              >
+                {chunk}
+              </motion.span>
+            ),
+          )}
+        </span>
+      ))}
+    </p>
   )
 }
 

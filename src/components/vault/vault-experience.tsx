@@ -1,18 +1,19 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { DigitTray } from '@/components/vault/digit-tray'
 import { PinPad } from '@/components/vault/pin-pad'
 import { PuzzleHub } from '@/components/vault/puzzle-hub'
-import { VaultDoor } from '@/components/vault/vault-door'
+import { OPEN_CHOREO, VaultDoor } from '@/components/vault/vault-door'
 import { InvitationFlow } from '@/components/invitation/invitation-flow'
 import { unlockVault } from '@/lib/client-api'
 import type { LockedVault, OpenedVault } from '@/lib/vault'
 
-type Stage = 'door' | 'puzzles' | 'keypad' | 'opened'
+type Stage = 'door' | 'puzzles' | 'keypad' | 'opening' | 'opened'
 
 export function VaultExperience({ vault }: { vault: LockedVault }) {
+  const still = useReducedMotion()
   const [stage, setStage] = useState<Stage>('door')
   const [solved, setSolved] = useState<Record<string, string>>({})
   const [digitByPosition, setDigitByPosition] = useState<Record<number, string>>({})
@@ -28,12 +29,26 @@ export function VaultExperience({ vault }: { vault: LockedVault }) {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }, [stage])
 
+  // Die Öffnung ist eine feste Sequenz — erst wenn sie durchgelaufen ist,
+  // schneidet die Seite auf die Einladung.
+  useEffect(() => {
+    if (stage !== 'opening') return
+    const timer = setTimeout(
+      () => setStage('opened'),
+      still ? 500 : OPEN_CHOREO.total * 1000,
+    )
+    return () => clearTimeout(timer)
+  }, [stage, still])
+
   const solvedCount = Object.keys(solved).length
-  const progress = vault.puzzles.length
+  const rawProgress = vault.puzzles.length
     ? solvedCount / vault.puzzles.length
     : stage === 'door'
       ? 0
       : 1
+  // Im Moment des Öffnens sitzt jeder Riegel — egal, wie viele Rätsel man
+  // übersprungen hat.
+  const progress = stage === 'opening' ? 1 : rawProgress
 
   const trayDigits = useMemo(
     () =>
@@ -52,7 +67,7 @@ export function VaultExperience({ vault }: { vault: LockedVault }) {
 
     if ('opened' in result && result.opened) {
       setOpened(result.vault)
-      setStage('opened')
+      setStage('opening')
       return
     }
 
@@ -73,7 +88,7 @@ export function VaultExperience({ vault }: { vault: LockedVault }) {
   }
 
   if (stage === 'opened' && opened) {
-    return <InvitationFlow slug={vault.slug} vault={vault} opened={opened} />
+    return <InvitationFlow slug={vault.slug} vault={vault} opened={opened} emerge />
   }
 
   return (
@@ -136,51 +151,110 @@ export function VaultExperience({ vault }: { vault: LockedVault }) {
             </motion.div>
           )}
 
-          {stage === 'keypad' && (
+          {/* Keypad und Öffnung teilen sich einen Key: es ist dieselbe Tür,
+              an der man eben noch gedreht hat. Ein Neu-Mounten würde den
+              Schnitt kaputt machen. */}
+          {(stage === 'keypad' || stage === 'opening') && (
             <motion.div
               key="keypad"
               className="flex w-full flex-col items-center gap-8"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -16 }}
+              exit={{ opacity: 0 }}
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
             >
-              <div className="w-full max-w-sm">
+              {/* Kamerafahrt: langsam an, dann in die Höhle hinein. */}
+              <motion.div
+                className="w-full max-w-sm"
+                initial={false}
+                animate={
+                  stage === 'opening' && !still
+                    ? { scale: [1, 1.04, 1.14, 1.95], y: [0, 0, 8, 52] }
+                    : { scale: 1, y: 0 }
+                }
+                transition={
+                  stage === 'opening'
+                    ? {
+                        duration: still ? 0 : OPEN_CHOREO.total,
+                        // Lange ruhig stehen, erst mit dem Schwenk hineinfahren.
+                        times: [0, 0.44, 0.66, 1],
+                        ease: [0.6, 0, 0.35, 1],
+                      }
+                    : { duration: still ? 0 : 0.4 }
+                }
+              >
                 <VaultDoor
                   recipientName={vault.recipientName}
                   progress={progress}
-                  state={shaking ? 'shaking' : 'closed'}
+                  state={stage === 'opening' ? 'opening' : shaking ? 'shaking' : 'closed'}
                 />
-              </div>
+              </motion.div>
 
-              <PinPad
-                length={vault.pinLength}
-                value={pin}
-                onChange={(next) => {
-                  setPin(next)
-                  setError(null)
+              <motion.div
+                className="flex w-full flex-col items-center gap-8"
+                aria-hidden={stage === 'opening'}
+                initial={false}
+                animate={{
+                  opacity: stage === 'opening' ? 0 : 1,
+                  y: stage === 'opening' ? 18 : 0,
                 }}
-                onSubmit={submitPin}
-                disabled={busy}
-                error={error}
-              />
+                transition={{ duration: still ? 0 : 0.45, ease: [0.16, 1, 0.3, 1] }}
+                style={{ pointerEvents: stage === 'opening' ? 'none' : 'auto' }}
+              >
+                <PinPad
+                  length={vault.pinLength}
+                  value={pin}
+                  onChange={(next) => {
+                    setPin(next)
+                    setError(null)
+                  }}
+                  onSubmit={submitPin}
+                  disabled={busy || stage === 'opening'}
+                  error={error}
+                />
 
-              {vault.puzzles.length > 0 && (
-                <>
-                  <DigitTray length={vault.puzzles.length} digits={trayDigits} />
-                  <button
-                    type="button"
-                    onClick={() => setStage('puzzles')}
-                    className="text-fog hover:text-brass text-sm underline underline-offset-4 transition-colors"
-                  >
-                    Zurück zu den Rätseln
-                  </button>
-                </>
-              )}
+                {vault.puzzles.length > 0 && (
+                  <>
+                    <DigitTray length={vault.puzzles.length} digits={trayDigits} />
+                    <button
+                      type="button"
+                      onClick={() => setStage('puzzles')}
+                      className="text-fog hover:text-brass text-sm underline underline-offset-4 transition-colors"
+                    >
+                      Zurück zu den Rätseln
+                    </button>
+                  </>
+                )}
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
+
+      {stage === 'opening' && (
+        <>
+          <p className="sr-only" role="status">
+            Die Kombination stimmt. Der Tresor öffnet sich.
+          </p>
+          {/* Das Licht aus der Höhle nimmt den Raum ein und wird zum Schnitt
+              auf die Einladung — dort blendet es wieder auf. */}
+          <motion.div
+            aria-hidden
+            className="pointer-events-none fixed inset-0 z-50"
+            style={{
+              background:
+                'radial-gradient(circle at 50% 44%, var(--color-brass-bright) 0%, var(--color-brass) 30%, var(--color-brass-shadow) 58%, var(--color-ink) 82%)',
+            }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: still ? 0 : [0, 0, 0.16, 1] }}
+            transition={{
+              duration: still ? 0 : OPEN_CHOREO.total,
+              times: [0, 0.68, 0.84, 1],
+              ease: 'easeIn',
+            }}
+          />
+        </>
+      )}
     </main>
   )
 }
