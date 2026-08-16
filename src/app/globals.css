@@ -166,7 +166,7 @@ input[inputmode='numeric'] {
   --perforation-size: 12px;
   /* Höhe der Abrisskante, gemessen von oben. Muss über dem Fussbereich
      liegen, sonst schneidet die Perforation durch den Strichcode. */
-  --cutouts-adjust: 198px;
+  --cutouts-adjust: 226px;
 
   /* Die Karte bleibt in ihren Originalmassen und wird als Ganzes vergrössert:
      Verlaufe, Perforation und Körnung sind auf dieses Format abgestimmt und
@@ -176,7 +176,10 @@ input[inputmode='numeric'] {
 
   position: relative;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  /* `minmax(0, 1fr)` und nicht `1fr`: sonst wächst die Mittelzeile mit ihrem
+     Inhalt, der Fussbereich rutscht unter die Karte — und die Schrumpf-Logik
+     in `holo-ticket.tsx` sieht nie einen Überlauf. */
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 0.75rem;
   grid-template-areas:
     'header'
@@ -307,7 +310,6 @@ input[inputmode='numeric'] {
 }
 
 .holo-header {
-  position: relative;
   grid-area: header;
   margin: 0 8px;
   text-align: center;
@@ -330,10 +332,28 @@ input[inputmode='numeric'] {
   margin: 0 1em;
   padding: 0.25em 0.5em;
   font-weight: 200;
-  font-size: 0.6rem;
-  line-height: 1.6;
+  /* Ausgangswert — `holo-ticket.tsx` schrumpft ihn, wenn der Text nicht in
+     die feste Höhe des Mittelteils passt. */
+  font-size: 0.74rem;
+  line-height: 1.55;
   color: #000;
+  /* Verhindert, dass eine überlange Unternehmung seitlich aus der Karte
+     läuft, bevor die Schrift überhaupt schrumpfen kann. */
+  overflow-wrap: break-word;
+  min-height: 0;
+  overflow: hidden;
   z-index: 1;
+}
+
+/* Der Empfänger steht im Mittelteil und nicht im Abriss: dort wächst ein
+   langer Name in eine zweite Zeile und schöbe den Strichcode aus der Karte —
+   die Abrisskante sitzt aber auf einer festen Höhe. */
+.holo-for {
+  margin-top: 0.6em;
+}
+
+.holo-for .holo-bold {
+  font-weight: 600;
 }
 
 .holo-footer {
@@ -342,19 +362,6 @@ input[inputmode='numeric'] {
   margin: 0 1em 1em 1em;
   display: flex;
   flex-direction: column;
-}
-
-.holo-number {
-  margin-bottom: 0.75rem;
-  text-align: center;
-  border-radius: 999px 0;
-  color: #000;
-  font-size: 0.6rem;
-  font-weight: 200;
-}
-
-.holo-number .holo-bold {
-  font-weight: 600;
 }
 
 .holo-barcode {
@@ -391,26 +398,13 @@ input[inputmode='numeric'] {
 }
 
 .holo-code {
-  margin-top: 0.5rem;
+  margin-top: 0.45rem;
   text-align: center;
   font-family: var(--font-mono);
-  font-size: 0.45rem;
+  font-size: 0.55rem;
   letter-spacing: 0.25em;
   text-transform: uppercase;
   color: #0009;
-}
-
-.holo-symbol {
-  position: absolute;
-  /* In px, nicht em: sonst wandert die Schere mit der Kopfzeilengrösse in
-     die erste Textzeile. */
-  top: 26px;
-  right: 0px;
-  rotate: 185deg;
-  font-size: 1rem;
-  color: #fff;
-  line-height: 0.5;
-  opacity: 0.2;
 }
 
 .holo-notes {

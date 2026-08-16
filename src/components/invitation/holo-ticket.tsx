@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, type PointerEvent } from 'react'
+import { useLayoutEffect, useRef, type PointerEvent } from 'react'
 import { useReducedMotion } from 'motion/react'
 import type { TicketData } from '@/components/invitation/ticket'
 import { formatDuration } from '@/lib/time'
@@ -16,9 +16,29 @@ import { formatDuration } from '@/lib/time'
  * Beim Zeigen kippt die Karte und das Hologramm wandert mit. Das ist der
  * ganze 3D-Effekt: er darf nichts kosten, wenn niemand hinzeigt.
  */
+/** Schriftgrad des Mittelteils in rem — Ausgangswert und Untergrenze. */
+const BODY_REM = 0.74
+const BODY_MIN_REM = 0.52
+
 export function HoloTicket({ data }: { data: TicketData }) {
   const still = useReducedMotion()
   const tilt = useRef<HTMLDivElement>(null)
+  const body = useRef<HTMLDivElement>(null)
+
+  // Der Mittelteil hat eine feste Höhe, sein Text nicht: eine lange
+  // Unternehmung plus lange Namen sprengen ihn. Statt abzuschneiden schrumpft
+  // die Schrift, bis alles hineinpasst — lieber klein und vollständig.
+  useLayoutEffect(() => {
+    const node = body.current
+    if (!node) return
+
+    let size = BODY_REM
+    node.style.fontSize = `${size}rem`
+    while (node.scrollHeight > node.clientHeight && size > BODY_MIN_REM) {
+      size -= 0.02
+      node.style.fontSize = `${size}rem`
+    }
+  }, [data])
 
   function follow(event: PointerEvent<HTMLDivElement>) {
     // Nur Maus/Stift: auf dem Touchscreen liegt der Finger auf der Karte und
@@ -78,14 +98,9 @@ export function HoloTicket({ data }: { data: TicketData }) {
             ✦ ✦ ✦ ✦
           </div>
 
-          <div className="holo-header">
-            TICKET
-            <div aria-hidden className="holo-symbol">
-              ✁
-            </div>
-          </div>
+          <div className="holo-header">TICKET</div>
 
-          <div className="holo-body">
+          <div ref={body} className="holo-body">
             <em>{data.optionLabel}</em>
             <br />
             {day}
@@ -99,12 +114,12 @@ export function HoloTicket({ data }: { data: TicketData }) {
                 mit {data.hostName}
               </>
             )}
+            <div className="holo-for">
+              Für <span className="holo-bold">{data.recipientName}</span>
+            </div>
           </div>
 
           <div className="holo-footer">
-            <div className="holo-number">
-              Für <span className="holo-bold">{data.recipientName}</span>
-            </div>
             <div aria-hidden className="holo-barcode" />
             <div className="holo-code">{data.slug}</div>
           </div>
