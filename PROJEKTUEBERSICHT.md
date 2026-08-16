@@ -65,6 +65,12 @@ importiert `server-only`: ein versehentlicher Client-Import bricht den Build.
 Typen: `src/lib/supabase/types.ts`, generiert —
 `npx supabase gen types typescript --project-id kivmcjlrepexusiagtac`
 
+Migrationen: `supabase/migrations/`, dieselben Versionsnummern wie die
+Historie im Projekt (`supabase_migrations.schema_migrations`) — bereits
+angewandte Stände werden dadurch nicht erneut ausgeführt. Eine neue Migration
+gehört als Datei hierher **und** in die Datenbank; wer sie nur remote anwendet,
+hinterlässt ein Repo, aus dem sich das Schema nicht mehr aufbauen lässt.
+
 ### 3.2 Plunk — E-Mail-Versand
 
 |              |                                                                                                                     |
