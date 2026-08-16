@@ -2,6 +2,8 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 import { hashToken } from '@/lib/crypto'
 import { env } from '@/lib/env'
+import { invitationMail } from '@/lib/invitation-mail'
+import { send } from '@/lib/mail'
 import { db } from '@/lib/supabase/server'
 import { formatDay } from '@/lib/time'
 
@@ -24,7 +26,9 @@ export default async function ConfirmPage({ searchParams }: PageProps<'/bestaeti
 
   const { data: vault } = await db()
     .from('vaults')
-    .select('id, slug, status, recipient_name, creator_name, creator_email, timezone')
+    .select(
+      'id, slug, status, recipient_name, recipient_email, intro_text, creator_name, creator_email, timezone',
+    )
     .eq('confirm_token_hash', hashToken(value))
     .maybeSingle()
 
@@ -51,6 +55,13 @@ export default async function ConfirmPage({ searchParams }: PageProps<'/bestaeti
 
   const shareUrl = `${env.siteUrl}/v/${vault.slug}`
 
+  // Jetzt — und keinen Moment früher — darf die Einladung raus: erst dieser
+  // Klick beweist, dass hinter dem Absender jemand steht, der die Adresse des
+  // Empfängers freiwillig eingetragen hat.
+  const invitation = vault.recipient_email
+    ? await sendInvitation({ ...vault, recipient_email: vault.recipient_email }, shareUrl)
+    : null
+
   // Was der Tresor enthält, steht ab jetzt nur noch in der Datenbank: der
   // Entwurf im Browser ist beim Abschicken gelöscht worden.
   const [{ data: options }, { data: slots }] = await Promise.all([
@@ -71,10 +82,37 @@ export default async function ConfirmPage({ searchParams }: PageProps<'/bestaeti
           Der Tresor steht
         </h1>
         <p className="text-fog mt-4">
-          Schick {vault.recipient_name} diesen Link. Mehr braucht es nicht.
+          {invitation === 'sent' || invitation === 'already'
+            ? `Die Einladung ist unterwegs zu ${vault.recipient_name}. Mehr braucht es nicht.`
+            : `Schick ${vault.recipient_name} diesen Link. Mehr braucht es nicht.`}
         </p>
 
-        <div className="border-brass/40 bg-brass/8 mt-8 rounded-xl border p-5">
+        {invitation === 'sent' || invitation === 'already' ? (
+          <div className="border-brass/40 bg-brass/8 mt-8 rounded-xl border p-5 text-left">
+            <p className="text-2xs text-brass-dim tracking-[0.25em] uppercase">
+              Einladung verschickt
+            </p>
+            <p className="text-parchment mt-2">{vault.recipient_email}</p>
+            <p className="text-fog-dim mt-3 text-sm">
+              Mit deinem ersten Satz, deinem Namen und dem Link zum Tresor. Der Link steht
+              unten — falls du ihn zusätzlich selbst weitergeben willst.
+            </p>
+          </div>
+        ) : (
+          invitation === 'failed' && (
+            <div className="border-signal-no/50 bg-signal-no/8 mt-8 rounded-xl border p-5 text-left">
+              <p className="text-2xs text-signal-no tracking-[0.25em] uppercase">
+                Einladung nicht zustellbar
+              </p>
+              <p className="text-parchment mt-2">{vault.recipient_email}</p>
+              <p className="text-fog-dim mt-3 text-sm">
+                Der Tresor steht trotzdem. Schick den Link unten am besten selbst.
+              </p>
+            </div>
+          )
+        )}
+
+        <div className="border-brass/40 bg-brass/8 mt-6 rounded-xl border p-5">
           <p className="text-2xs text-fog-dim tracking-[0.25em] uppercase">
             Link zum Teilen
           </p>
@@ -115,6 +153,71 @@ export default async function ConfirmPage({ searchParams }: PageProps<'/bestaeti
       </div>
     </main>
   )
+}
+
+type InvitationTarget = {
+  id: string
+  recipient_name: string
+  recipient_email: string
+  intro_text: string | null
+  creator_name: string | null
+}
+
+/**
+ * Die gestaltete Einladung an den Empfänger. Sie geht genau einmal raus.
+ *
+ * Der Anspruch wird vor dem Versand eingetragen und nicht danach: E-Mail-Links
+ * werden von Vorschau-Diensten und Sicherheitsscannern besucht, gelegentlich
+ * gleichzeitig mit dem Menschen. Beide Aufrufe fänden ein leeres Feld vor und
+ * die Einladung ginge doppelt raus. Wer die Zeile nicht gesetzt bekommt, hat
+ * verloren und schickt nichts.
+ */
+async function sendInvitation(
+  vault: InvitationTarget,
+  shareUrl: string,
+): Promise<'sent' | 'failed' | 'already'> {
+  const { data: claimed } = await db()
+    .from('vaults')
+    .update({ invitation_sent_at: new Date().toISOString() })
+    .eq('id', vault.id)
+    .is('invitation_sent_at', null)
+    .select('id')
+    .maybeSingle()
+
+  if (!claimed) return 'already'
+
+  const mail = invitationMail({
+    recipientName: vault.recipient_name,
+    senderName: vault.creator_name,
+    introText: vault.intro_text,
+    url: shareUrl,
+    reportUrl: `${env.siteUrl}/melden`,
+  })
+
+  const result = await send({
+    to: vault.recipient_email,
+    ...mail,
+    // Die Adresse steht schon in unserer Datenbank und wird dort mit dem
+    // Tresor gelöscht. Eine zweite Ablage beim Versanddienst hätte kein
+    // eigenes Ende — also den Kontakt gleich wieder wegräumen.
+    forget: true,
+  })
+
+  if (!result.ok) {
+    console.error('Einladung nicht zustellbar', result)
+    // Der Eintrag oben war eine Wette auf den Versand. Sie ging verloren, also
+    // zurücknehmen: das Feld soll nur behaupten, was wirklich passiert ist.
+    await db().from('vaults').update({ invitation_sent_at: null }).eq('id', vault.id)
+    return 'failed'
+  }
+
+  // Ohne `logEvent`: das ist bewusst fire-and-forget, und eine Server-Komponente
+  // ist nach dem Rendern fertig — der Einschub käme womöglich nie an.
+  await db()
+    .from('vault_events')
+    .insert({ vault_id: vault.id, kind: 'invitation_mailed' })
+
+  return 'sent'
 }
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {

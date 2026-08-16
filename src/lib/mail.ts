@@ -17,6 +17,15 @@ type Mail = {
   to: string
   subject: string
   text: string
+  /**
+   * Fertiges HTML. Nur für die Einladung an den Empfänger — sie ist das eine
+   * Stück Post, das jemand bekommt, der Voulez noch gar nicht kennt, und darf
+   * deshalb aussehen wie die Seite selbst.
+   *
+   * `text` bleibt trotzdem Pflicht: er ist die Fassung, die ohne
+   * E-Mail-Versand im Log landet, und beschreibt im Code, was drinsteht.
+   */
+  html?: string
   attachments?: Attachment[]
   /**
    * Den Kontakt, den Plunk beim Versand anlegt, danach wieder löschen.
@@ -56,20 +65,28 @@ function sender(): { email: string; name?: string } {
 }
 
 /**
- * Plunk verschickt ausschliesslich HTML — ein Text mit Zeilenumbrüchen käme
- * als ein einziger Absatz an. Also escapen und die Umbrüche explizit setzen.
+ * Text, der in HTML eingesetzt wird — egal ob in eine Zeile Fliesstext oder in
+ * eine gestaltete Vorlage.
  *
  * Die geschweiften Klammern gehören mit escaped: Plunk ersetzt `{{feld}}`
  * durch Kontaktdaten und löscht übrig gebliebene Platzhalter ersatzlos. Eine
  * Besuchernachricht mit `{{…}}` würde sonst still verschwinden.
  */
-function toHtml(text: string): string {
-  const escaped = text
+export function escapeHtml(text: string): string {
+  return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/\{/g, '&#123;')
+}
+
+/**
+ * Plunk verschickt ausschliesslich HTML — ein Text mit Zeilenumbrüchen käme
+ * als ein einziger Absatz an. Also escapen und die Umbrüche explizit setzen.
+ */
+function toHtml(text: string): string {
+  const escaped = escapeHtml(text)
     // Die Mails richten ihre Beschriftungen mit Leerzeichen aus („Was:   …").
     // HTML klappt Folgen von Leerzeichen zusammen, also die inneren festhalten.
     .replace(/ {2,}/g, (run) => '&nbsp;'.repeat(run.length - 1) + ' ')
@@ -119,7 +136,7 @@ export async function send(mail: Mail): Promise<SendResult> {
         ...(from.name ? { name: from.name } : {}),
         to: mail.to,
         subject: mail.subject,
-        body: toHtml(mail.text),
+        body: mail.html ?? toHtml(mail.text),
         ...(mail.attachments?.length ? { attachments: mail.attachments } : {}),
       }),
     })

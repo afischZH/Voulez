@@ -227,9 +227,11 @@ export type Database = {
           failed_attempts: number
           id: string
           intro_text: string | null
+          invitation_sent_at: string | null
           locked_until: string | null
           pin_hash: string
           pin_length: number
+          recipient_email: string | null
           recipient_name: string
           reveal_text: string
           slug: string
@@ -251,9 +253,11 @@ export type Database = {
           failed_attempts?: number
           id?: string
           intro_text?: string | null
+          invitation_sent_at?: string | null
           locked_until?: string | null
           pin_hash: string
           pin_length?: number
+          recipient_email?: string | null
           recipient_name: string
           reveal_text: string
           slug: string
@@ -275,9 +279,11 @@ export type Database = {
           failed_attempts?: number
           id?: string
           intro_text?: string | null
+          invitation_sent_at?: string | null
           locked_until?: string | null
           pin_hash?: string
           pin_length?: number
+          recipient_email?: string | null
           recipient_name?: string
           reveal_text?: string
           slug?: string

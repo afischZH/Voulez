@@ -56,6 +56,7 @@ export async function POST(request: Request) {
       creator_email: draft.data.creatorEmail,
       creator_name: draft.data.creatorName || null,
       recipient_name: draft.data.recipientName,
+      recipient_email: draft.data.recipientEmail || null,
       intro_text: draft.data.introText || null,
       reveal_text: draft.data.revealText,
       closing_text: draft.data.closingText || null,
@@ -125,6 +126,13 @@ export async function POST(request: Request) {
       '',
       `${env.siteUrl}/bestaetigen?token=${confirmToken}`,
       '',
+      ...(draft.data.recipientEmail
+        ? [
+            `Mit diesem Klick geht auch die Einladung an ${draft.data.recipientEmail}.`,
+            `Vorher wird dorthin nichts geschickt.`,
+            '',
+          ]
+        : []),
       `Danach bekommst du den Link zum Teilen und einen Verwaltungslink.`,
       `Hebe diese E-Mail auf — der Verwaltungslink steht nur hier:`,
       `${env.siteUrl}/verwalten?token=${editToken}`,
@@ -168,6 +176,7 @@ function summaryLines(draft: Draft): string[] {
     '— Deine Angaben —',
     '',
     `Für:         ${draft.recipientName}`,
+    `Einladung an: ${draft.recipientEmail || 'niemanden — du gibst den Link selbst weiter'}`,
     `Kombination: ${pinFor(draft.puzzles)}`,
     `Rätsel:      ${draft.puzzles.map((p, i) => `${p.digit} — ${p.title || `Rätsel ${i + 1}`}`).join('\n             ')}`,
     `Zur Auswahl: ${draft.options.map((o) => o.label).join(' · ')}`,

@@ -159,6 +159,13 @@ export function CreateWizard() {
             <strong className="text-parchment">{sent}</strong> geschickt. Ein Klick darin,
             und der Tresor geht online.
           </p>
+          {draft.recipientEmail && (
+            <p className="text-fog mt-4">
+              Danach geht die Einladung an{' '}
+              <strong className="text-parchment">{draft.recipientEmail}</strong> — vorher
+              nicht.
+            </p>
+          )}
           <p className="text-fog-dim mt-6 text-sm">
             Diese E-Mail enthält auch deinen Verwaltungslink. Heb sie auf.
           </p>
@@ -237,9 +244,21 @@ export function CreateWizard() {
                 maxLength={60}
                 autoFocus
               />
+              {/* Freiwillig: ohne Adresse bleibt alles wie bisher — der Link
+                  geht an den Ersteller, der ihn selbst weiterreicht. */}
+              <TextInput
+                label="E-Mail (optional)"
+                type="email"
+                inputMode="email"
+                hint={`Dann schicken wir ${draft.recipientName.trim() || 'ihm oder ihr'} die Einladung selbst, sobald du deine eigene Adresse bestätigt hast. Ohne Adresse bekommst du den Link zum Weitergeben.`}
+                value={draft.recipientEmail}
+                onChange={(e) => patch({ recipientEmail: e.target.value })}
+                placeholder="alex@beispiel.ch"
+                maxLength={200}
+              />
               <TextArea
                 label="Erster Satz (optional)"
-                hint="Steht unter dem Tresor, bevor irgendetwas passiert."
+                hint="Steht unter dem Tresor, bevor irgendetwas passiert — und in der Einladungs-E-Mail, falls du eine schickst."
                 rows={2}
                 value={draft.introText}
                 onChange={(e) => patch({ introText: e.target.value })}
@@ -609,11 +628,19 @@ export function CreateWizard() {
   )
 }
 
+/** Eine Adresse muss nicht stehen — wenn sie steht, muss sie stimmen. */
+const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
 /** Was fehlt, bevor es weitergehen darf. */
 function validate(step: number, draft: Draft): string | null {
   switch (step) {
-    case 0:
-      return draft.recipientName.trim() ? null : 'Ein Name fehlt noch.'
+    case 0: {
+      if (!draft.recipientName.trim()) return 'Ein Name fehlt noch.'
+      const email = draft.recipientEmail.trim()
+      return !email || EMAIL.test(email)
+        ? null
+        : 'Diese E-Mail-Adresse sieht nicht richtig aus.'
+    }
     case 1: {
       if (draft.puzzles.length < 2) return 'Mindestens zwei Rätsel.'
       const broken = draft.puzzles.find((p) => puzzleComplete(p))
@@ -626,9 +653,7 @@ function validate(step: number, draft: Draft): string | null {
     case 4:
       return draft.slots.length ? null : 'Mindestens ein Zeitfenster.'
     case 6:
-      return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(draft.creatorEmail)
-        ? null
-        : 'Eine gültige E-Mail-Adresse fehlt.'
+      return EMAIL.test(draft.creatorEmail) ? null : 'Eine gültige E-Mail-Adresse fehlt.'
     default:
       return null
   }
@@ -661,7 +686,14 @@ function Heading({ title, sub }: { title: string; sub?: string }) {
 function Summary({ draft }: { draft: Draft }) {
   return (
     <dl className="space-y-4">
-      <Row label="Für">{draft.recipientName}</Row>
+      <Row label="Für">
+        {draft.recipientName}
+        <span className="text-fog-dim mt-1 block text-sm">
+          {draft.recipientEmail
+            ? `Einladung geht nach deiner Bestätigung an ${draft.recipientEmail}.`
+            : 'Ohne Adresse — du bekommst den Link zum Weitergeben.'}
+        </span>
+      </Row>
       <Row label="Kombination">
         <span className="tnum text-brass-bright text-xl tracking-[0.3em]">
           {pinFor(draft.puzzles)}

@@ -120,6 +120,13 @@ export default async function ManagePage({ searchParams }: PageProps<'/verwalten
                 ? `Letzte Aktivität: ${formatDateTime(events[0].created_at, vault.timezone)}`
                 : 'Noch niemand war da.'}
             </p>
+            {vault.recipient_email && (
+              <p className="text-fog-dim mt-2 text-sm">
+                {vault.invitation_sent_at
+                  ? `Einladung an ${vault.recipient_email} verschickt am ${formatDateTime(vault.invitation_sent_at, vault.timezone)}.`
+                  : `Die Einladung an ${vault.recipient_email} liess sich nicht zustellen — gib den Link selbst weiter.`}
+              </p>
+            )}
           </div>
         )}
 

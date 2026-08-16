@@ -24,6 +24,13 @@ export default function PrivacyPage() {
           Rätsel samt Lösungen, die Auswahlmöglichkeiten und Zeitfenster.
         </li>
         <li>
+          <strong>Die E-Mail-Adresse des Empfängers</strong> — nur wenn du sie einträgst.
+          Sie wird für eine einzige Nachricht verwendet: die Einladung, die nach deiner
+          Bestätigung rausgeht. Darin stehen dein Name, dein erster Satz und der Link zum
+          Tresor. Danach wird die Adresse für nichts mehr benutzt, nicht weitergegeben und
+          mit dem Tresor gelöscht.
+        </li>
+        <li>
           <strong>Die PIN.</strong> Nur als Hashwert (scrypt). Im Klartext existiert sie
           nirgends — auch der Betreiber kann sie nicht auslesen.
         </li>

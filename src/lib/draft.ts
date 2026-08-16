@@ -18,6 +18,17 @@ export const draftPuzzleSchema = z.object({
 
 export const draftSchema = z.object({
   recipientName: z.string().trim().min(1).max(60),
+  /** Freiwillig. Steht sie hier, schickt Voulez die Einladung selbst — aber
+   *  erst, wenn der Ersteller seine eigene Adresse bestätigt hat. Leer heisst:
+   *  der Ersteller reicht den Link von Hand weiter, wie bisher. */
+  recipientEmail: z
+    .string()
+    .trim()
+    .max(200)
+    .refine((value) => value === '' || z.email().safeParse(value).success, {
+      message: 'Keine gültige E-Mail-Adresse.',
+    })
+    .default(''),
   introText: z.string().trim().max(240),
   revealText: z.string().trim().min(1).max(2000),
   closingText: z.string().trim().max(200),
@@ -73,6 +84,7 @@ export const OPTION_PRESETS = [
 
 export const EMPTY_DRAFT: Draft = {
   recipientName: '',
+  recipientEmail: '',
   introText: '',
   revealText: '',
   closingText: '',
