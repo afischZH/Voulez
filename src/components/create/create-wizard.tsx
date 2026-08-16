@@ -9,6 +9,7 @@ import {
   puzzleComplete,
 } from '@/components/create/puzzle-editors'
 import { SlotPicker } from '@/components/create/slot-picker'
+import { TextSamples } from '@/components/create/text-samples'
 import {
   EMPTY_DRAFT,
   OPTION_PRESETS,
@@ -17,6 +18,12 @@ import {
   type DraftPuzzle,
 } from '@/lib/draft'
 import { PUZZLE_CATALOG } from '@/lib/puzzles/catalog'
+import {
+  CLOSING_SAMPLES,
+  HINT_SAMPLES,
+  INTRO_SAMPLES,
+  REVEAL_SAMPLES,
+} from '@/lib/samples'
 import { formatDay } from '@/lib/time'
 
 const STEPS = [
@@ -239,6 +246,13 @@ export function CreateWizard() {
                 placeholder="Vier Ziffern liegen zwischen dir und dem, was hier drin liegt."
                 maxLength={240}
               />
+              <TextSamples
+                samples={INTRO_SAMPLES}
+                recipientName={draft.recipientName}
+                value={draft.introText}
+                onPick={(introText) => patch({ introText })}
+                variant="chips"
+              />
             </div>
           )}
 
@@ -314,6 +328,13 @@ export function CreateWizard() {
                               }
                               maxLength={200}
                             />
+                            <TextSamples
+                              samples={HINT_SAMPLES[puzzle.kind]}
+                              recipientName={draft.recipientName}
+                              value={puzzle.hint}
+                              onPick={(hint) => updatePuzzle(puzzle.id, { hint })}
+                              variant="chips"
+                            />
                           </div>
                         )}
                       </li>
@@ -370,6 +391,12 @@ export function CreateWizard() {
                 maxLength={2000}
                 autoFocus
               />
+              <TextSamples
+                samples={REVEAL_SAMPLES}
+                recipientName={draft.recipientName}
+                value={draft.revealText}
+                onPick={(revealText) => patch({ revealText })}
+              />
               <TextInput
                 label="Schlusszeile (optional)"
                 hint="Steht rechtsbündig darunter, wie eine Unterschrift."
@@ -377,6 +404,13 @@ export function CreateWizard() {
                 onChange={(e) => patch({ closingText: e.target.value })}
                 placeholder="Such dir aus, was und wann."
                 maxLength={200}
+              />
+              <TextSamples
+                samples={CLOSING_SAMPLES}
+                recipientName={draft.recipientName}
+                value={draft.closingText}
+                onPick={(closingText) => patch({ closingText })}
+                variant="chips"
               />
             </div>
           )}
