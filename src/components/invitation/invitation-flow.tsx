@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
+import { HoloTicket } from '@/components/invitation/holo-ticket'
 import { Ticket, type TicketData } from '@/components/invitation/ticket'
 import { TicketMailer } from '@/components/invitation/ticket-mailer'
 import { formatDay, slotTimes } from '@/lib/time'
@@ -448,7 +449,46 @@ export function InvitationFlow({
             {...fade}
             className="flex w-full flex-col items-center"
           >
-            <Ticket data={ticket} />
+            <motion.p
+              className="text-2xs text-brass-dim mb-8 tracking-[0.4em] uppercase print:hidden"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5, duration: 0.6 }}
+            >
+              Abgemacht
+            </motion.p>
+
+            {/* Die Karte fällt aus der Tiefe auf den Tisch — der Abschluss
+                soll sich wie ein Gegenstand anfühlen, nicht wie eine Seite. */}
+            <motion.div
+              style={still ? undefined : { transformPerspective: 1100 }}
+              initial={
+                still
+                  ? { opacity: 0 }
+                  : {
+                      opacity: 0,
+                      scale: 0.72,
+                      y: -40,
+                      rotateX: -35,
+                      filter: 'blur(10px)',
+                    }
+              }
+              animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0, filter: 'blur(0px)' }}
+              transition={{ duration: still ? 0.3 : 1.1, ease: [0.16, 1, 0.3, 1] }}
+            >
+              <HoloTicket data={ticket} />
+            </motion.div>
+
+            {ticket.message && (
+              <p className="border-brass/50 text-fog mt-8 max-w-md border-l-2 pl-4 text-sm italic print:hidden">
+                „{ticket.message}&ldquo;
+              </p>
+            )}
+
+            {/* Auf Papier gehört ein lesbarer Pass hin, kein Hologramm. */}
+            <div className="hidden print:block">
+              <Ticket data={ticket} />
+            </div>
 
             <div className="mt-8 flex flex-wrap justify-center gap-3 print:hidden">
               <a

@@ -134,6 +134,306 @@ input[inputmode='numeric'] {
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Holo-Ticket — das physische Gegenstück zur Zusage.
+   Basiert auf "Holographic Ticket" von dexter-st (uiverse.io, MIT),
+   angepasst an Format, Inhalt und Neigung dieser Seite.
+   Bewusst plain CSS und nicht Tailwind: Masken, Blend-Modes und der
+   SVG-Filter lassen sich als Utility-Klassen nicht sinnvoll ausdrücken.
+--------------------------------------------------------------------------- */
+
+/* Perspektive liegt am Rahmen, nicht an der Karte: die Karte hat ihre eigene
+   Schwebe-Animation auf `transform`, die eine Inline-Neigung überschreiben
+   würde. */
+.holo-stage {
+  perspective: 1100px;
+  /* Lichtpunkt des Hologramms. Steht hier und nicht auf der Karte, weil die
+     Neigung ihn auf `.holo-tilt` überschreibt — eine eigene Deklaration
+     weiter unten würde diese immer schlagen. */
+  --holo-x: 60%;
+  --holo-y: 50%;
+}
+
+.holo-tilt {
+  transform-style: preserve-3d;
+  transition: transform 0.25s var(--ease-vault);
+  will-change: transform;
+}
+
+.holo-card {
+  --width: 180px;
+  --height: 320px;
+  --perforation-size: 12px;
+  /* Höhe der Abrisskante, gemessen von oben. Muss über dem Fussbereich
+     liegen, sonst schneidet die Perforation durch den Strichcode. */
+  --cutouts-adjust: 198px;
+
+  /* Die Karte bleibt in ihren Originalmassen und wird als Ganzes vergrössert:
+     Verlaufe, Perforation und Körnung sind auf dieses Format abgestimmt und
+     werden bei grösseren Pixelmassen grell statt pastellig. `zoom` statt
+     `scale`, damit die Karte im Layout auch wirklich so viel Platz belegt. */
+  zoom: 1.55;
+
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.75rem;
+  grid-template-areas:
+    'header'
+    'body'
+    'footer';
+
+  width: var(--width);
+  height: var(--height);
+  padding: var(--perforation-size) 0;
+
+  font-size: 1rem;
+  user-select: none;
+  overflow: hidden;
+
+  filter: drop-shadow(0 2px 1px #00000025) drop-shadow(0 4px 3px #00000025)
+    drop-shadow(0 10px 9px #00000025) drop-shadow(0 20px 20px #00000025)
+    drop-shadow(0 40px 40px #00000025);
+  animation: holo-hover 3s ease infinite;
+  will-change: transform, filter;
+}
+
+@keyframes holo-hover {
+  50% {
+    filter: drop-shadow(0 4px 3px #00000015) drop-shadow(0 6px 6px #00000015)
+      drop-shadow(0 16px 14px #00000015) drop-shadow(0 30px 28px #00000015)
+      drop-shadow(0 60px 60px #00000015);
+    transform: translateY(-7px) scale(1.02);
+  }
+}
+
+.holo-filter {
+  position: absolute;
+}
+
+.holo-bg {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-color: #fff;
+  filter: url(#holo-bump);
+  mask:
+    /* Perforation oben */
+    radial-gradient(
+      circle at 50% 0,
+      #fff0 calc(var(--perforation-size) - 5px),
+      #000 calc(var(--perforation-size) - 4px)
+    ),
+    /* Perforation unten */
+    radial-gradient(
+        circle at 50% 100%,
+        #fff0 calc(var(--perforation-size) - 5px),
+        #000 calc(var(--perforation-size) - 4px)
+      ),
+    /* Kerbe links */ radial-gradient(circle 8px at left center, #000 98%, #0000 100%),
+    /* Kerbe rechts */ radial-gradient(circle 8px at right center, #000 98%, #0000 100%),
+    /* Abrisskante */
+    repeating-linear-gradient(90deg, #000 10px, #000 15px, #0000 16px, #0000 24px);
+
+  mask-repeat: repeat-x, repeat-x, no-repeat, no-repeat, repeat-x;
+
+  mask-size:
+    calc(var(--perforation-size) * 2) 100%,
+    calc(var(--perforation-size) * 2) 100%,
+    16px 16px,
+    16px 16px,
+    10px 2px;
+
+  mask-position:
+    calc(0.5 * var(--perforation-size)) top,
+    calc(0.5 * var(--perforation-size)) bottom,
+    left var(--cutouts-adjust),
+    right var(--cutouts-adjust),
+    0 calc(var(--cutouts-adjust) + 7px);
+
+  mask-composite: intersect, exclude, add, add;
+}
+
+.holo-sheen {
+  background-image:
+    linear-gradient(to bottom, #fe58, 90%, #0002),
+    conic-gradient(
+      at var(--holo-x) var(--holo-y),
+      #ccc,
+      #ff6bfe,
+      #00f9f8,
+      #ddd,
+      #0081fd,
+      #eef0bc,
+      #0081fd,
+      #ff6bfe,
+      #0002,
+      #0081fd,
+      #ddd,
+      #01fefb,
+      #ccc
+    );
+}
+
+.holo-sheen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 70% 20%, #f0f, #0000),
+    repeating-radial-gradient(circle at 30% 80%, #fff, #f4a 48px, #eeeeee 150px);
+  mix-blend-mode: color-burn;
+}
+
+.holo-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(to bottom, #f205, #f00, #0f0, #f205);
+  mix-blend-mode: difference;
+
+  animation: holo-bg-pos 3s ease-in-out infinite alternate;
+  background-position: 0 0;
+  background-size: 100% 300%;
+  background-repeat: repeat;
+}
+
+@keyframes holo-bg-pos {
+  to {
+    background-position: 0 500px;
+  }
+}
+
+.holo-header {
+  position: relative;
+  grid-area: header;
+  margin: 0 8px;
+  text-align: center;
+  z-index: 1;
+  /* Statt Impact: Cinzel ist die Gravurschrift dieser Seite, und der
+     Differenz-Blend darunter trägt sie genauso. */
+  font-family: var(--font-display);
+  font-size: 2.1rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  line-height: 1.05;
+  color: #ffffff9f;
+  text-shadow: 0 0 0 #000;
+  -webkit-text-stroke: #fff 0.7px;
+  mix-blend-mode: difference;
+}
+
+.holo-body {
+  grid-area: body;
+  margin: 0 1em;
+  padding: 0.25em 0.5em;
+  font-weight: 200;
+  font-size: 0.6rem;
+  line-height: 1.6;
+  color: #000;
+  z-index: 1;
+}
+
+.holo-footer {
+  grid-area: footer;
+  z-index: 1;
+  margin: 0 1em 1em 1em;
+  display: flex;
+  flex-direction: column;
+}
+
+.holo-number {
+  margin-bottom: 0.75rem;
+  text-align: center;
+  border-radius: 999px 0;
+  color: #000;
+  font-size: 0.6rem;
+  font-weight: 200;
+}
+
+.holo-number .holo-bold {
+  font-weight: 600;
+}
+
+.holo-barcode {
+  align-self: center;
+  width: 0;
+  height: 32px;
+  box-shadow:
+    0px 0 0 1px #000,
+    5px 0 0 1px #000,
+    7px 0 0 1px #000,
+    11px 0 0 1px #000,
+    15px 0 0 1px #000,
+    16px 0 0 1px #000,
+    22px 0 0 1px #000,
+    27px 0 0 1px #000,
+    30px 0 0 1px #000,
+    35px 0 0 1px #000,
+    36px 0 0 1px #000,
+    39px 0 0 1px #000,
+    43px 0 0 1px #000,
+    47px 0 0 1px #000,
+    50px 0 0 1px #000,
+    55px 0 0 1px #000,
+    59px 0 0 1px #000,
+    60px 0 0 1px #000,
+    64px 0 0 1px #000,
+    69px 0 0 1px #000,
+    70px 0 0 1px #000,
+    74px 0 0 1px #000;
+  /* Die Balken wachsen per box-shadow nach rechts, das Element selbst ist
+     0px breit. `align-self` setzt also den linken Rand in die Mitte — die
+     halbe Strichbreite muss von Hand zurück. */
+  transform: translateX(-37px);
+}
+
+.holo-code {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.45rem;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: #0009;
+}
+
+.holo-symbol {
+  position: absolute;
+  /* In px, nicht em: sonst wandert die Schere mit der Kopfzeilengrösse in
+     die erste Textzeile. */
+  top: 26px;
+  right: 0px;
+  rotate: 185deg;
+  font-size: 1rem;
+  color: #fff;
+  line-height: 0.5;
+  opacity: 0.2;
+}
+
+.holo-notes {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  font-size: 2.5rem;
+  letter-spacing: 0.3em;
+  color: #e7e7e7;
+  mix-blend-mode: color-burn;
+  transform: translateY(20%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.holo-notes:nth-child(2) {
+  transform: translateY(40%);
+}
+
+.holo-notes:nth-child(3) {
+  transform: translateY(60%);
+}
+
 /* Ticket-Druck: nur das Ticket, auf weißem Papier, ohne Deko. */
 @media print {
   @page {
