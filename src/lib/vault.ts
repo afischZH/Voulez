@@ -50,6 +50,12 @@ export async function findVault(slug: string): Promise<VaultRow | null> {
   return data ?? null
 }
 
+/** Vom Ticket-Link aus ist nur die ID der Antwort bekannt, nicht der Slug. */
+export async function vaultById(id: string): Promise<VaultRow | null> {
+  const { data } = await db().from('vaults').select('*').eq('id', id).maybeSingle()
+  return data ?? null
+}
+
 /**
  * Ein Tresor ist nur spielbar, wenn er bestätigt (`live`), nicht abgelaufen
  * und nicht gesperrt ist. `draft` heisst: die Doppel-Opt-In-Mail wurde noch

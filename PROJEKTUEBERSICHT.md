@@ -174,7 +174,7 @@ Alle Antworten mit `Cache-Control: no-store, no-cache, must-revalidate`
 | `…/puzzles/[puzzleId]/surrender`   | POST    | ≥ 3 Fehlversuche                    | Notausgang: gibt die Ziffer heraus                                                                                                                                                                          |
 | `/api/v/[slug]/unlock`             | POST    | Rate-Limit `unlock` + Tresor-Sperre | PIN prüfen; erst hier kommt `revealText` heraus, setzt Öffnungs-Cookie                                                                                                                                      |
 | `/api/v/[slug]/respond`            | POST    | Öffnungs-Cookie + Rate-Limit        | Zu-/Absage speichern, Ersteller benachrichtigen (Mail mit `await`, nicht nebenher — sonst friert die Funktion vorher ein). Eigener Vorschlag (`customLabel`, freier Termin) nur bei `allow_custom_proposal` |
-| `/api/v/[slug]/ticket.ics`         | GET     | Öffnungs-Cookie                     | Kalenderdatei                                                                                                                                                                                               |
+| `/api/t/[token]/ticket.ics`        | GET     | Ticket-Token                        | Kalenderdatei zum gespeicherten Ticket                                                                                                                                                                      |
 | `/api/v/[slug]/ticket/email`       | POST    | Öffnungs-Cookie + 4/h               | Ticket an eine frei getippte Adresse; Kontakt wird sofort gelöscht _(neu, noch nicht committet)_                                                                                                            |
 | `/api/report`                      | POST    | 5/h                                 | Missbrauchsmeldung an `REPORT_TO`; sperrt bewusst nichts automatisch                                                                                                                                        |
 | `/api/cron/cleanup`                | GET     | `CRON_SECRET`                       | Aufräum-Lauf, siehe unten                                                                                                                                                                                   |
@@ -188,6 +188,7 @@ Alle Antworten mit `Cache-Control: no-store, no-cache, must-revalidate`
 | `/bestaetigen?token=`                   | Doppel-Opt-In, `noindex`                        |
 | `/verwalten?token=`                     | Tresor deaktivieren                             |
 | `/v/[slug]`                             | Der Tresor — bewusst ohne Navigation und Footer |
+| `/t/[token]`                            | Das gespeicherte Ticket, `noindex`              |
 | `/impressum`, `/datenschutz`, `/melden` | Rechtstexte                                     |
 
 ---
@@ -253,6 +254,16 @@ TTL 6 Stunden, `sameSite: lax`, `secure` in Produktion. Ohne ihn liesse sich
 
 > `SESSION_SECRET` darf nach dem Livegang **nicht** mehr geändert werden — es
 > leitet die Memory-Kartenbilder ab.
+
+### Ticket-Link (`src/lib/ticket.ts`)
+
+`/t/<token>` ist ein Capability-Link: 32 Byte Zufall, gespeichert als
+`responses.ticket_token_hash`. Wer ihn hat, sieht die Karte — ohne PIN, ohne
+Öffnungs-Cookie. Das ist Absicht: der Besuch soll seine Verabredung morgen noch
+aufrufen können, und der Ersteller kommt an den beantworteten Tresor nicht mehr
+heran. Der Token entsteht einmal in `/respond` und steht danach nur noch dort,
+wo ihn jemand mitgenommen hat. Ein gesperrter oder abgelaufener Tresor zeigt
+auch sein Ticket nicht mehr.
 
 ### Rate-Limits (`src/lib/rate-limit.ts`)
 

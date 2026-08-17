@@ -94,6 +94,7 @@ export type Database = {
           message: string | null
           option_id: string | null
           starts_at: string | null
+          ticket_token_hash: string | null
           vault_id: string
         }
         Insert: {
@@ -106,6 +107,7 @@ export type Database = {
           message?: string | null
           option_id?: string | null
           starts_at?: string | null
+          ticket_token_hash?: string | null
           vault_id: string
         }
         Update: {
@@ -118,6 +120,7 @@ export type Database = {
           message?: string | null
           option_id?: string | null
           starts_at?: string | null
+          ticket_token_hash?: string | null
           vault_id?: string
         }
         Relationships: [

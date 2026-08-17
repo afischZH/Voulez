@@ -1,14 +1,21 @@
 import { z } from 'zod'
+import { hashToken } from '@/lib/crypto'
 import { errors, fail, ok } from '@/lib/http'
 import { buildIcs, googleCalendarUrl } from '@/lib/ics'
 import { send } from '@/lib/mail'
 import { allow, clientFingerprint, LIMITS } from '@/lib/rate-limit'
 import { hasUnlocked } from '@/lib/session'
 import { db } from '@/lib/supabase/server'
+import { ticketUrl } from '@/lib/ticket'
 import { formatDateTime, formatDuration } from '@/lib/time'
 import { findVault, logEvent, playable } from '@/lib/vault'
 
-const bodySchema = z.object({ email: z.email().max(200) })
+const bodySchema = z.object({
+  email: z.email().max(200),
+  /** Der Ticket-Link, den der Besuch gerade vor sich hat. Optional: eine
+   *  Zusage von vor dieser Änderung hat keinen. */
+  token: z.string().max(64).optional(),
+})
 
 /**
  * Schickt dem Besucher seine eigene Bestätigung — dieselben Daten, die nach
@@ -52,7 +59,7 @@ export async function POST(
   const { data: response } = await db()
     .from('responses')
     .select(
-      'id,accepted,starts_at,duration_min,created_at,option_id,custom_label,message',
+      'id,accepted,starts_at,duration_min,created_at,option_id,custom_label,message,ticket_token_hash',
     )
     .eq('vault_id', vault.id)
     .maybeSingle()
@@ -73,6 +80,14 @@ export async function POST(
   // an derselben Stelle.
   const what = option?.label ?? response.custom_label ?? 'Unternehmung'
   const host = vault.creator_name ?? 'deinem Gastgeber'
+
+  // Nur wenn der mitgeschickte Token wirklich zu dieser Zusage gehört. Sonst
+  // stünde in der Mail ein Link, der irgendwohin zeigt — geprüft wird gegen
+  // den Hash, denn den Token selbst speichert Voulez nirgends.
+  const link =
+    body.data.token && response.ticket_token_hash === hashToken(body.data.token)
+      ? ticketUrl(body.data.token)
+      : null
 
   const event = {
     uid: `${response.id}@voulez`,
@@ -99,6 +114,7 @@ export async function POST(
       `Code:  ${slug}`,
       response.message ? `\nDeine Nachricht: „${response.message}"` : '',
       '',
+      link ? `Dein Ticket bleibt hier: ${link}\n` : '',
       `Der Termin liegt als Kalenderdatei bei.`,
       `Ohne .ics-Anhang geht es auch hier: ${googleCalendarUrl(event)}`,
       '',

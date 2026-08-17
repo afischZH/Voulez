@@ -1,10 +1,12 @@
 import { z } from 'zod'
 import { db } from '@/lib/supabase/server'
+import { hashToken, newToken } from '@/lib/crypto'
 import { errors, ok } from '@/lib/http'
 import { buildIcs, googleCalendarUrl } from '@/lib/ics'
 import { send } from '@/lib/mail'
 import { allow, clientFingerprint, LIMITS } from '@/lib/rate-limit'
 import { hasUnlocked } from '@/lib/session'
+import { ticketUrl } from '@/lib/ticket'
 import { formatDateTime, slotTimes, zonedToUtc } from '@/lib/time'
 import { findVault, logEvent, playable } from '@/lib/vault'
 
@@ -153,6 +155,11 @@ export async function POST(
     if (ahead > MAX_DAYS_AHEAD) return errors.badRequest('Das liegt zu weit weg.')
   }
 
+  // Der Ticket-Link. Er entsteht genau hier und nur hier — danach steht in
+  // der Datenbank nur noch sein Hash, und wer ihn nicht mitgenommen hat,
+  // bekommt ihn nicht zurück.
+  const ticketToken = newToken()
+
   // `id` und `created_at` werden für den Kalendereintrag gebraucht: die UID
   // muss stabil sein, damit ein zweiter Download denselben Termin aktualisiert
   // statt einen weiteren anzulegen.
@@ -167,6 +174,7 @@ export async function POST(
       starts_at: startsAt.toISOString(),
       duration_min: durationMin,
       message: message ?? null,
+      ticket_token_hash: hashToken(ticketToken),
     })
     .select('id, created_at')
     .single()
@@ -197,6 +205,7 @@ export async function POST(
     ownIdea: Boolean(customLabel),
     ownTime: customTime,
     message: message ?? null,
+    ticket: ticketUrl(ticketToken),
     event: {
       uid: `${response.id}@voulez`,
       start: startsAt,
@@ -216,15 +225,17 @@ export async function POST(
       startsAt: startsAt.toISOString(),
       durationMin,
       message: message ?? null,
+      token: ticketToken,
+      url: ticketUrl(ticketToken),
     },
   })
 }
 
 /**
- * Die Zusage-Mail an den Ersteller. Sie trägt den Termin als Anhang, statt
- * irgendwohin zu verlinken: der Ersteller hat kein Öffnungs-Cookie, kommt
- * also weder an `/api/v/[slug]/ticket.ics` noch an den Tresor selbst — der
- * gilt nach der Antwort als nicht mehr spielbar.
+ * Die Zusage-Mail an den Ersteller. Der Termin liegt als Datei bei, denn der
+ * Ersteller hat kein Öffnungs-Cookie und kommt an den Tresor selbst nicht mehr
+ * heran — der gilt nach der Antwort als beantwortet. Der Ticket-Link führt
+ * trotzdem hin: er trägt seinen Nachweis in sich.
  */
 async function notifyAccept(args: {
   to: string
@@ -237,6 +248,8 @@ async function notifyAccept(args: {
   /** Der Zeitpunkt liegt ausserhalb der Fenster, die angeboten wurden. */
   ownTime: boolean
   message: string | null
+  /** Der Link auf das gespeicherte Ticket. */
+  ticket: string
   event: Parameters<typeof buildIcs>[0]
 }) {
   const result = await send({
@@ -253,6 +266,8 @@ async function notifyAccept(args: {
       args.ownIdea || args.ownTime
         ? `\n${describeProposal(args.ownIdea, args.ownTime)}`
         : '',
+      '',
+      `Das Ticket dazu: ${args.ticket}`,
       '',
       `Der Termin liegt als Kalenderdatei bei.`,
       `Ohne .ics-Anhang geht es auch hier: ${googleCalendarUrl(args.event)}`,

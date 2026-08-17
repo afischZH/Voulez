@@ -16,7 +16,7 @@ const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
  * Ersteller hat der Besucher keine Adresse hinterlegt, an die man von selbst
  * etwas schicken könnte. Also: freiwillig, hier, nach der Zusage.
  */
-export function TicketMailer({ slug }: { slug: string }) {
+export function TicketMailer({ slug, token }: { slug: string; token: string }) {
   const [email, setEmail] = useState('')
   const [state, setState] = useState<State>({ kind: 'idle' })
 
@@ -36,7 +36,9 @@ export function TicketMailer({ slug }: { slug: string }) {
     const res = await fetch(`/api/v/${encodeURIComponent(slug)}/ticket/email`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email: address }),
+      // Der Token kommt mit, damit der Link zum Ticket in der Mail stehen
+      // kann: gespeichert ist serverseitig nur sein Hash.
+      body: JSON.stringify({ email: address, token }),
     })
     const json = await res.json().catch(() => ({}))
 
@@ -56,7 +58,7 @@ export function TicketMailer({ slug }: { slug: string }) {
           Unterwegs an <strong className="text-brass-bright">{state.email}</strong>.
         </p>
         <p className="text-fog-dim mt-2 text-sm">
-          Der Termin liegt als Kalenderdatei bei.
+          Mit dem Link zum Ticket und dem Termin als Kalenderdatei.
         </p>
         <button
           type="button"

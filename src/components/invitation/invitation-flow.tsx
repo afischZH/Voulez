@@ -2,9 +2,9 @@
 
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { HoloTicket } from '@/components/invitation/holo-ticket'
-import { Ticket, type TicketData } from '@/components/invitation/ticket'
+import type { TicketData } from '@/components/invitation/ticket'
 import { TicketMailer } from '@/components/invitation/ticket-mailer'
+import { TicketView } from '@/components/invitation/ticket-view'
 import { formatDay, slotTimes } from '@/lib/time'
 import type { LockedVault, OpenedVault } from '@/lib/vault'
 
@@ -44,7 +44,12 @@ export function InvitationFlow({
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [ticket, setTicket] = useState<TicketData | null>(null)
+  /** Nach der Zusage: die Karte und ihr eigener, bleibender Link. */
+  const [ticket, setTicket] = useState<{
+    data: TicketData
+    token: string
+    url: string
+  } | null>(null)
 
   const days = useMemo(
     () => [...new Set(opened.slots.map((s) => s.day))].sort(),
@@ -104,14 +109,18 @@ export function InvitationFlow({
     if (!accepted) return setStage('declined')
 
     setTicket({
-      slug,
-      optionLabel: json.ticket.optionLabel,
-      startsAt: json.ticket.startsAt,
-      durationMin: json.ticket.durationMin,
-      message: json.ticket.message,
-      recipientName: vault.recipientName,
-      hostName: opened.hostName,
-      timezone: opened.timezone,
+      data: {
+        slug,
+        optionLabel: json.ticket.optionLabel,
+        startsAt: json.ticket.startsAt,
+        durationMin: json.ticket.durationMin,
+        message: json.ticket.message,
+        recipientName: vault.recipientName,
+        hostName: opened.hostName,
+        timezone: opened.timezone,
+      },
+      token: json.ticket.token,
+      url: json.ticket.url,
     })
     setStage('ticket')
   }
@@ -460,53 +469,9 @@ export function InvitationFlow({
 
             {/* Die Karte fällt aus der Tiefe auf den Tisch — der Abschluss
                 soll sich wie ein Gegenstand anfühlen, nicht wie eine Seite. */}
-            <motion.div
-              style={still ? undefined : { transformPerspective: 1100 }}
-              initial={
-                still
-                  ? { opacity: 0 }
-                  : {
-                      opacity: 0,
-                      scale: 0.72,
-                      y: -40,
-                      rotateX: -35,
-                      filter: 'blur(10px)',
-                    }
-              }
-              animate={{ opacity: 1, scale: 1, y: 0, rotateX: 0, filter: 'blur(0px)' }}
-              transition={{ duration: still ? 0.3 : 1.1, ease: [0.16, 1, 0.3, 1] }}
-            >
-              <HoloTicket data={ticket} />
-            </motion.div>
-
-            {ticket.message && (
-              <p className="border-brass/50 text-fog mt-8 max-w-md border-l-2 pl-4 text-sm italic print:hidden">
-                „{ticket.message}&ldquo;
-              </p>
-            )}
-
-            {/* Auf Papier gehört ein lesbarer Pass hin, kein Hologramm. */}
-            <div className="hidden print:block">
-              <Ticket data={ticket} />
-            </div>
-
-            <div className="mt-8 flex flex-wrap justify-center gap-3 print:hidden">
-              <a
-                href={`/api/v/${encodeURIComponent(slug)}/ticket.ics`}
-                className="border-brass bg-brass/16 text-brass-bright hover:bg-brass/26 rounded-lg border px-6 py-3 transition-colors"
-              >
-                Im Kalender speichern
-              </a>
-              <button
-                type="button"
-                onClick={() => window.print()}
-                className="border-steel-600 text-parchment hover:border-brass/60 rounded-lg border px-6 py-3 transition-colors"
-              >
-                Drucken
-              </button>
-            </div>
-
-            <TicketMailer slug={slug} />
+            <TicketView data={ticket.data} token={ticket.token} url={ticket.url} drop>
+              <TicketMailer slug={slug} token={ticket.token} />
+            </TicketView>
           </motion.section>
         )}
 
