@@ -73,4 +73,7 @@ export const LIMITS = {
   /** Ticket per E-Mail — knapp gehalten, weil der Besucher die Zieladresse
    *  frei tippt und der Endpunkt sonst als Versandweg missbraucht würde. */
   ticketMail: { limit: 4, windowSeconds: 3600 },
+  /** Wallet-Pässe. Anders als die .ics-Datei kostet jeder Pass eine RSA-
+   *  Signatur — der Endpunkt darf keine billige CPU-Schleuder sein. */
+  wallet: { limit: 20, windowSeconds: 600 },
 } as const

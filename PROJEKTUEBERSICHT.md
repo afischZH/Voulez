@@ -175,6 +175,8 @@ Alle Antworten mit `Cache-Control: no-store, no-cache, must-revalidate`
 | `/api/v/[slug]/unlock`             | POST    | Rate-Limit `unlock` + Tresor-Sperre | PIN prüfen; erst hier kommt `revealText` heraus, setzt Öffnungs-Cookie                                                                                                                                      |
 | `/api/v/[slug]/respond`            | POST    | Öffnungs-Cookie + Rate-Limit        | Zu-/Absage speichern, Ersteller benachrichtigen (Mail mit `await`, nicht nebenher — sonst friert die Funktion vorher ein). Eigener Vorschlag (`customLabel`, freier Termin) nur bei `allow_custom_proposal` |
 | `/api/t/[token]/ticket.ics`        | GET     | Ticket-Token                        | Kalenderdatei zum gespeicherten Ticket                                                                                                                                                                      |
+| `/api/t/[token]/wallet/apple`      | GET     | Ticket-Token + Rate-Limit `wallet`  | Signierter `.pkpass`. Ohne Apple-Zertifikate in der Umgebung: 404                                                                                                                                           |
+| `/api/t/[token]/wallet/google`     | GET     | Ticket-Token + Rate-Limit `wallet`  | 302 auf `pay.google.com/gp/v/save/<jwt>`. Ohne Google-Konfiguration: 404                                                                                                                                    |
 | `/api/v/[slug]/ticket/email`       | POST    | Öffnungs-Cookie + 4/h               | Ticket an eine frei getippte Adresse; Kontakt wird sofort gelöscht _(neu, noch nicht committet)_                                                                                                            |
 | `/api/report`                      | POST    | 5/h                                 | Missbrauchsmeldung an `REPORT_TO`; sperrt bewusst nichts automatisch                                                                                                                                        |
 | `/api/cron/cleanup`                | GET     | `CRON_SECRET`                       | Aufräum-Lauf, siehe unten                                                                                                                                                                                   |
@@ -265,6 +267,36 @@ heran. Der Token entsteht einmal in `/respond` und steht danach nur noch dort,
 wo ihn jemand mitgenommen hat. Ein gesperrter oder abgelaufener Tresor zeigt
 auch sein Ticket nicht mehr.
 
+### Wallet-Pässe (`src/lib/wallet/`)
+
+Zwei Wege, bewusst unterschiedlich streng:
+
+**Apple** (`apple.ts`) baut den `.pkpass` vollständig hier — ZIP aus `pass.json`,
+Bildern, einem SHA-1-Manifest und einer abgetrennten PKCS#7-Signatur darüber
+(`node-forge`, weil Node-`crypto` kein SignedData kann; `fflate` fürs ZIP).
+Apple sieht davon nichts, deshalb darf auch die persönliche Nachricht als
+Rückseitenfeld mit. Kein `webServiceURL`: eine Antwort ist unveränderlich, es
+gibt nichts nachzuschieben. Die Bilder liegen in `src/assets/wallet/` und
+kommen über `outputFileTracingIncludes` ins Funktionsbündel — ohne diesen
+Eintrag baut der Pass lokal und scheitert auf Vercel.
+
+**Google** (`google.ts`) kann das nicht: das Objekt landet in Googles Systemen
+und überlebt dort die 90-Tage-Löschung. Deshalb geht nur Vorname, Anlass,
+Termin und Ticket-Link mit — **kein Nachrichtentext, keine Adresse, kein Name
+des Gastgebers**. Wer das ändert, ändert eine Zusage in `/datenschutz`. Der JWT
+(RS256, Node-`crypto`, keine Bibliothek) trägt nur das Objekt; die Klasse legt
+`scripts/create-google-class.mjs` einmalig an. Googles Grenze liegt bei 2048
+Zeichen — gemessen sind es rund 1650, mit den längsten erlaubten Texten knapp 1800. `saveUrl` wirft, wenn es doch reicht, statt stumm bei Google zu scheitern.
+
+Beide Seriennummern sind `sha256('voulez:<art>:v1:' + token)`: deterministisch,
+damit ein zweiter Download dieselbe Karte aktualisiert, und durch das eigene
+Präfix ungleich dem `ticket_token_hash` in der Datenbank.
+
+Fehlt Konfiguration, antworten beide Routen mit 404 und der Knopf erscheint gar
+nicht erst (`wallet/flags.ts`, wirft nie — halb konfiguriert gilt als nicht
+konfiguriert). Der Weg zum Browser läuft über `OpenedVault.wallet`, das ohnehin
+schon über die Leitung geht.
+
 ### Rate-Limits (`src/lib/rate-limit.ts`)
 
 DB-gestützt, weil Serverless-Instanzen keinen Speicher teilen. Im Fehlerfall
@@ -277,6 +309,7 @@ DB-gestützt, weil Serverless-Instanzen keinen Speicher teilen. Im Fehlerfall
 | `create`     | 5     | 1 h     |
 | `respond`    | 10    | 1 h     |
 | `ticketMail` | 4     | 1 h     |
+| `wallet`     | 20    | 10 min  |
 
 Dazu die Selbstverriegelung des Tresors über `register_failed_unlock` (ab dem
 zehnten Fehlversuch HTTP 423 — auch die richtige PIN wird dann abgewiesen).
@@ -314,24 +347,43 @@ benutzen.
 | `SITE_URL`                  | nein         | Default `http://localhost:3000`; in Produktion `https://voulez.love`             |
 | `CRON_SECRET`               | für den Cron | wie `SESSION_SECRET`; ohne Wert antwortet `/api/cron/cleanup` mit 503            |
 
+Dazu die Wallet-Pässe. Beide Blöcke werden **getrennt und vollständig** geprüft:
+fehlt in einem auch nur ein Wert, erscheint der zugehörige Knopf gar nicht erst
+und die Route antwortet mit 404.
+
+| Variable                     | Block  | Woher                                                                              |
+| ---------------------------- | ------ | ---------------------------------------------------------------------------------- |
+| `APPLE_PASS_TYPE_ID`         | Apple  | developer.apple.com → Identifiers → Pass Type IDs, z. B. `pass.love.voulez.ticket` |
+| `APPLE_TEAM_ID`              | Apple  | Membership-Seite                                                                   |
+| `APPLE_PASS_CERT_PEM_BASE64` | Apple  | Zertifikat aus dem `.p12`-Export, als PEM, base64                                  |
+| `APPLE_PASS_KEY_PEM_BASE64`  | Apple  | privater Schlüssel daraus, unverschlüsselt, base64                                 |
+| `APPLE_WWDR_CERT_PEM_BASE64` | Apple  | **AppleWWDRCAG4**, base64. Nur G4 — G2/G3/G5/G6 werden auf dem Gerät abgelehnt     |
+| `GOOGLE_WALLET_ISSUER_ID`    | Google | Google Pay & Wallet Console                                                        |
+| `GOOGLE_WALLET_CLIENT_EMAIL` | Google | JSON-Schlüssel des Service-Accounts, Feld `client_email`                           |
+| `GOOGLE_WALLET_PRIVATE_KEY`  | Google | ebendaher, Feld `private_key`, mitsamt der literalen `\n`                          |
+| `GOOGLE_WALLET_CLASS_SUFFIX` | Google | optional, Default `voulez_einladung_v1`                                            |
+
 `src/lib/env.ts` liest sie über Getter und wirft bei fehlendem Pflichtwert.
-Alle Variablen sind serverseitig — bewusst kein `NEXT_PUBLIC_`.
+Alle Variablen sind serverseitig — bewusst kein `NEXT_PUBLIC_`. Die Wallet-Werte
+prüft zusätzlich `src/lib/wallet/flags.ts`, das nie wirft: es läuft beim Rendern
+der Ticketseite, wo eine leere Variable keine Störung ist, sondern die Aussage
+„diesen Knopf gibt es hier nicht".
 
 > Umgebungsvariablen bei Vercel wirken erst im **nächsten** Deployment, nicht
 > rückwirkend.
 
 ### Dateien
 
-| Datei                 | Inhalt                                                             |
-| --------------------- | ------------------------------------------------------------------ |
-| `next.config.ts`      | Security-Header, `poweredByHeader: false`                          |
-| `vercel.json`         | Cron-Zeitplan `20 4 * * *`                                         |
-| `tsconfig.json`       | `strict`, `moduleResolution: bundler`, Alias `@/*` → `./src/*`     |
-| `eslint.config.mjs`   | Flat Config: `core-web-vitals` + `typescript`                      |
-| `postcss.config.mjs`  | nur `@tailwindcss/postcss`                                         |
-| `.prettierrc.json`    | keine Semikolons, Single Quotes, `printWidth: 90`, Tailwind-Plugin |
-| `.claude/launch.json` | Dev-Server `npm run dev` auf Port 3000                             |
-| `.gitignore`          | `.env*` ignoriert, `.env.example` ausgenommen                      |
+| Datei                 | Inhalt                                                                  |
+| --------------------- | ----------------------------------------------------------------------- |
+| `next.config.ts`      | Security-Header, `poweredByHeader: false`, File-Tracing der Pass-Bilder |
+| `vercel.json`         | Cron-Zeitplan `20 4 * * *`                                              |
+| `tsconfig.json`       | `strict`, `moduleResolution: bundler`, Alias `@/*` → `./src/*`          |
+| `eslint.config.mjs`   | Flat Config: `core-web-vitals` + `typescript`                           |
+| `postcss.config.mjs`  | nur `@tailwindcss/postcss`                                              |
+| `.prettierrc.json`    | keine Semikolons, Single Quotes, `printWidth: 90`, Tailwind-Plugin      |
+| `.claude/launch.json` | Dev-Server `npm run dev` auf Port 3000                                  |
+| `.gitignore`          | `.env*` ignoriert, `.env.example` ausgenommen                           |
 
 ---
 
@@ -414,6 +466,12 @@ src/lib/puzzles/         Ein Rätseltyp = eine Datei + ein Eintrag in index.ts
 src/lib/crypto.ts        scrypt für die PIN, SHA-256 für Tokens
 src/lib/vault.ts         Trennung zwischen "vor dem Öffnen" und "danach"
 src/lib/supabase/        Der einzige DB-Zugang, plus generierte Typen
+src/lib/wallet/          Apple- und Google-Pass, plus die Konfigurationsprüfung
+src/assets/wallet/       Die fünf PNGs im .pkpass. Nicht in public/ — sie
+                         gehören ins Funktionsbündel, nicht ins Netz
+scripts/                 Einmal-Werkzeuge von Hand, nie zur Laufzeit:
+                         apple-pass-env.sh, create-google-class.mjs
+certs/                   Schlüsselmaterial des Passes, gitignored, temporär
 ```
 
 ---
@@ -445,6 +503,36 @@ ist richtig, solange nicht markiert ist, welche stimmt.
 (dieselbe PIN, alle vier Rätseltypen). Ticket in Apple und Google Kalender
 importieren, Druckvorschau ansehen.
 
+**Wallet-Pass** — weder `typecheck` noch `lint` merken etwas von einer falschen
+Signatur oder einem kaputten ZIP. Deshalb von Hand:
+
+```bash
+curl -s -o /tmp/t.pkpass http://localhost:3000/api/t/<token>/wallet/apple
+unzip -l /tmp/t.pkpass          # pass.json, manifest.json, signature, icon*, logo*
+unzip -p /tmp/t.pkpass signature     > /tmp/sig
+unzip -p /tmp/t.pkpass manifest.json > /tmp/man
+openssl smime -verify -inform DER -in /tmp/sig -content /tmp/man \
+  -CAfile wwdr-g4.pem -purpose any -noverify
+open /tmp/t.pkpass              # macOS: rendert den Pass — und verweigert ihn bei falscher Signatur
+```
+
+Fehlerbilder in der Reihenfolge, in der sie auftreten: in Safari passiert nichts
+→ falscher `content-type`. „Pass konnte nicht installiert werden" →
+`teamIdentifier`/`passTypeIdentifier` passen nicht zum Zertifikat. Signatur
+ungültig → WWDR nicht G4. Pass grau → `expirationDate` liegt zurück.
+
+**Nach dem ersten Deployment** die eine Sache prüfen, die lokal geht und in
+Produktion scheitern kann — fehlen die PNGs im Bündel, kommt 503:
+
+```bash
+curl -sI https://voulez.love/api/t/<token>/wallet/apple   # 200, ca. 30–60 KB
+```
+
+**Google** — `curl -sI …/wallet/google` muss 302 auf
+`pay.google.com/gp/v/save/<jwt>` liefern. Der Link nur mit einem in der
+Wallet-Konsole eingetragenen Test-Konto öffnen; im Demo-Modus trägt der Pass
+oben ein `[TEST ONLY]`-Band, das ist erwartet.
+
 ---
 
 ## 13. Offene Punkte
@@ -456,6 +544,33 @@ importieren, Druckvorschau ansehen.
 3. `prefers-reduced-motion: reduce` durchspielen
 4. Demo-Tresore `test` und `demo4` aus der Datenbank entfernen
 5. Wurzel-SPF von `v=spf1 -all` auf `v=spf1 include:amazonses.com ~all` ändern
+
+**Wallet-Pässe** — der Code steht, die Konten fehlen. Beide Knöpfe bleiben
+unsichtbar, solange die Variablen leer sind; ausliefern lässt sich das also
+gefahrlos vorab.
+
+1. ~~Apple~~ **erledigt.** Pass Type ID `pass.love.voulez.ticket`, Zertifikat
+   „Voulez Server" (Team `H3535D6UVW`), Schlüssel und WWDR G4 in `certs/`,
+   die fünf Werte stehen in `.env.local`. Signatur gegen Apples Wurzel-CA
+   geprüft. **Noch offen:** dieselben fünf Werte bei Vercel eintragen (wirken
+   erst im nächsten Deployment), und `certs/` löschen — der private Schlüssel
+   liegt dort unverschlüsselt und steckt base64-kodiert schon in `.env.local`.
+   Neu ausstellen ginge jederzeit mit `./scripts/apple-pass-env.sh`.
+2. Die fünf PNGs in `src/assets/wallet/` sind Platzhalter — dort steht ein
+   Messing-„V", nicht die Wortmarke. Vor dem ersten echten Pass ersetzen,
+   Grössen exakt einhalten (siehe `src/assets/wallet/README.md`).
+3. Google: Cloud-Projekt, Wallet API aktivieren, Service-Account, Issuer-Konto
+   in der Pay & Wallet Console; den Service-Account dort unter
+   „Google Wallet API → Users" als _Developer_ eintragen, sonst 403.
+   Dann einmal `node --env-file=.env.local scripts/create-google-class.mjs`.
+4. `GOOGLE_WALLET_*` in der **Produktionsumgebung leer lassen**, bis die
+   Freischaltung durch ist (bis zu zwei Werktage). Im Demo-Modus trägt jeder
+   Pass ein `[TEST ONLY]`-Band; in Preview setzen und dort entwickeln.
+
+**Stehender Betriebspunkt:** das Apple-Pass-Zertifikat läuft am
+**16. September 2027** ab. Danach signierte Pässe lehnt Wallet ab — die Website
+merkt davon nichts, nur der Knopf liefert 503. Kalendereintrag setzen; das
+Erneuern ist eine neue CSR plus ein Lauf von `./scripts/apple-pass-env.sh`.
 
 **Nicht committet** (Stand `git status`): der Ticket-per-Mail-Weg —
 `src/app/api/v/[slug]/ticket/email/route.ts` und

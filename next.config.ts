@@ -23,6 +23,17 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Die PNGs des Wallet-Passes werden zur Laufzeit von der Platte gelesen.
+  // Ohne diesen Eintrag folgt der Tracer dem dynamischen `readFile` nicht,
+  // die Bilder fehlen im Bündel der Serverless-Funktion — und der Pass
+  // scheitert auf Vercel, während er lokal einwandfrei baut.
+  //
+  // Der Schlüssel steht bewusst mit `*` statt `[token]`: picomatch liest die
+  // eckigen Klammern als Zeichenklasse. `*` überschreitet kein `/` und trifft
+  // genau das eine dynamische Segment.
+  outputFileTracingIncludes: {
+    '/api/t/*/wallet/apple': ['./src/assets/wallet/**'],
+  },
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }]
   },

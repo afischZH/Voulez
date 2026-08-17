@@ -42,6 +42,12 @@ npm run dev
 | `SITE_URL` | Basis-URL für Links in E-Mails |
 | `CRON_SECRET` | schützt den täglichen Aufräum-Lauf, gleiche Erzeugung wie `SESSION_SECRET` |
 
+Optional dazu die Wallet-Pässe: fünf `APPLE_PASS_*`/`APPLE_TEAM_ID`-Werte und
+drei `GOOGLE_WALLET_*`-Werte. Beide Blöcke werden getrennt und vollständig
+geprüft — fehlt in einem auch nur ein Wert, erscheint der zugehörige Knopf unter
+dem Ticket gar nicht erst. Die Beschaffung steht in `.env.example`, die Technik
+dahinter in `PROJEKTUEBERSICHT.md` §7.
+
 ### E-Mail-Versand: Plunk mit voulez.love
 
 Die Domain liegt bei Infomaniak (`ns11/ns12.infomaniak.ch`), verschickt wird

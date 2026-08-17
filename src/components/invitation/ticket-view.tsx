@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { motion, useReducedMotion } from 'motion/react'
 import { HoloTicket } from '@/components/invitation/holo-ticket'
 import { Ticket, type TicketData } from '@/components/invitation/ticket'
+import type { WalletFlags } from '@/lib/wallet/flags'
 
 /**
  * Das fertige Ticket — direkt nach der Zusage und später unter seinem eigenen
@@ -18,6 +19,7 @@ export function TicketView({
   data,
   token,
   url,
+  wallet = { apple: false, google: false },
   drop = false,
   children,
 }: {
@@ -26,6 +28,8 @@ export function TicketView({
   token: string
   /** Absolut, damit der Besuch ihn irgendwohin kopieren kann. */
   url: string
+  /** Aus `walletFlags()`. Ohne Zertifikate erscheint kein Wallet-Knopf. */
+  wallet?: WalletFlags
   drop?: boolean
   /** Was unter den Knöpfen steht — im Flow der Mailversand. */
   children?: React.ReactNode
@@ -66,6 +70,27 @@ export function TicketView({
         >
           Im Kalender speichern
         </a>
+        {/* Die Wallet-Knöpfe bleiben sekundär: der Kalendereintrag ist der
+            eine Weg, den jedes Gerät versteht. Beide werden immer gezeigt —
+            dieser Link existiert gerade dafür, dass die Karte auch auf einem
+            fremden Gerät aufgeht, und ein Blick auf die Kennung des Browsers
+            läge dort regelmässig daneben. */}
+        {wallet.apple && (
+          <a
+            href={`/api/t/${encodeURIComponent(token)}/wallet/apple`}
+            className="border-steel-600 text-parchment hover:border-brass/60 rounded-lg border px-6 py-3 transition-colors"
+          >
+            Zu Apple Wallet
+          </a>
+        )}
+        {wallet.google && (
+          <a
+            href={`/api/t/${encodeURIComponent(token)}/wallet/google`}
+            className="border-steel-600 text-parchment hover:border-brass/60 rounded-lg border px-6 py-3 transition-colors"
+          >
+            Zu Google Wallet
+          </a>
+        )}
         <button
           type="button"
           onClick={() => window.print()}
@@ -74,6 +99,20 @@ export function TicketView({
           Drucken
         </button>
       </div>
+
+      {/* Der Google-Pass verlässt als einziger Weg von hier das Haus. Wer ihn
+          speichert, soll vorher wissen, was mitgeht — nicht erst im
+          Datenschutz nachlesen müssen. */}
+      {wallet.google && (
+        <p className="text-2xs text-fog-dim mt-3 max-w-md text-center print:hidden">
+          Google Wallet erhält Vorname, Anlass, Termin und den Ticket-Link — nicht deine
+          Nachricht. Mehr im{' '}
+          <a href="/datenschutz" className="underline underline-offset-2">
+            Datenschutz
+          </a>
+          .
+        </p>
+      )}
 
       <TicketLink url={url} />
 

@@ -469,7 +469,13 @@ export function InvitationFlow({
 
             {/* Die Karte fällt aus der Tiefe auf den Tisch — der Abschluss
                 soll sich wie ein Gegenstand anfühlen, nicht wie eine Seite. */}
-            <TicketView data={ticket.data} token={ticket.token} url={ticket.url} drop>
+            <TicketView
+              data={ticket.data}
+              token={ticket.token}
+              url={ticket.url}
+              wallet={opened.wallet}
+              drop
+            >
               <TicketMailer slug={slug} token={ticket.token} />
             </TicketView>
           </motion.section>

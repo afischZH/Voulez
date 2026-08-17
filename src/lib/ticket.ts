@@ -23,6 +23,8 @@ export type SavedTicket = {
   data: TicketData
   /** Fertig für `buildIcs` — der Kalendereintrag hängt an denselben Daten. */
   event: Parameters<typeof buildIcs>[0]
+  /** Nur fürs Ereignis-Log. Vom Ticket-Link aus ist der Tresor sonst namenlos. */
+  vaultId: string
 }
 
 /** Base64url aus `newToken()`. Alles andere spart die Runde zur Datenbank. */
@@ -63,6 +65,7 @@ export async function findTicket(token: string): Promise<SavedTicket | null> {
   const what = option?.label ?? response.custom_label ?? 'Unternehmung'
 
   return {
+    vaultId: vault.id,
     data: {
       slug: vault.slug,
       optionLabel: what,
