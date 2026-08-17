@@ -60,6 +60,36 @@ export default function PrivacyPage() {
         keine Werbung, keine Analyse — deshalb auch kein Zustimmungsbanner.
       </p>
 
+      <h2>Wallet-Pässe</h2>
+      <p>
+        Steht ein Termin, lässt sich das Ticket zusätzlich in Apple Wallet oder Google
+        Wallet legen. Die beiden Wege unterscheiden sich, und zwar deutlich:
+      </p>
+      <ul>
+        <li>
+          <strong>Apple Wallet</strong> — der Pass entsteht auf unserem Server und wird
+          als Datei an dein Gerät übergeben. Apple bekommt dabei nichts zu sehen: weder
+          den Termin noch deinen Namen noch die Nachricht, die auf der Rückseite steht.
+        </li>
+        <li>
+          <strong>Google Wallet</strong> — hier geht es nicht ohne Google. Übertragen
+          werden dein Vorname, der Anlass, der Termin und der Link zum Ticket.{' '}
+          <strong>Nicht übertragen wird die persönliche Nachricht</strong>, und auch keine
+          E-Mail-Adresse.
+        </li>
+      </ul>
+      <p>
+        Ein gespeicherter Google-Pass liegt danach bei Google und nicht mehr bei uns. Die
+        90-Tage-Löschung unten erreicht ihn deshalb nicht — er bleibt, bis du ihn in
+        Google Wallet selbst entfernst. Das gilt nur für Leute, die diesen Knopf auch
+        wirklich drücken; wer ihn stehen lässt, gibt nichts weiter.
+      </p>
+      <p>
+        Für beide Pässe gilt, was auch für einen Ausdruck oder einen Screenshot gilt: was
+        einmal auf einem Gerät liegt, lässt sich von hier aus nicht zurückholen. Ein
+        deaktivierter Tresor gibt keine neuen Pässe mehr aus.
+      </p>
+
       <h2>Wie lange</h2>
       <p>
         Jeder Tresor wird 90 Tage nach seiner Erstellung gelöscht, samt Rätseln, Antwort
@@ -79,6 +109,10 @@ export default function PrivacyPage() {
         </li>
         <li>
           <strong>Vercel</strong> — Auftragsverarbeiter für den Betrieb der Website.
+        </li>
+        <li>
+          <strong>Google</strong> — nur für die oben beschriebenen Wallet-Pässe, und nur
+          bei denen, die den Knopf „Zu Google Wallet“ drücken.
         </li>
       </ul>
       <p>Es findet keine Weitergabe zu Werbe- oder Analysezwecken statt.</p>

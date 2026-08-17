@@ -3,6 +3,7 @@ import type { Metadata } from 'next'
 import { TicketView } from '@/components/invitation/ticket-view'
 import { QuietFooter } from '@/components/vault/quiet-footer'
 import { findTicket, ticketUrl } from '@/lib/ticket'
+import { walletFlags } from '@/lib/wallet/flags'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +30,12 @@ export default async function TicketPage({ params }: PageProps<'/t/[token]'>) {
             Abgemacht
           </p>
 
-          <TicketView data={ticket.data} token={token} url={ticketUrl(token)} />
+          <TicketView
+            data={ticket.data}
+            token={token}
+            url={ticketUrl(token)}
+            wallet={walletFlags()}
+          />
         </div>
       </main>
 

@@ -86,3 +86,27 @@ export function formatDateTime(iso: string, timeZone: string): string {
     timeZone,
   }).format(new Date(iso))
 }
+
+/**
+ * Datum und Uhrzeit getrennt — für Wallet-Pässe, deren Felder klein sind und
+ * die Uhrzeit ohnehin in einem eigenen Feld tragen. Bewusst hier neben
+ * `formatDateTime`: dieselbe Sprache, dieselbe Zeitzone, dieselbe Schreibweise.
+ * Ein Pass, der anders datiert als die Karte daneben, wirkt wie ein Fehler.
+ */
+export function formatDateOnly(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('de-CH', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone,
+  }).format(new Date(iso))
+}
+
+export function formatTimeOnly(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('de-CH', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone,
+  }).format(new Date(iso))
+}

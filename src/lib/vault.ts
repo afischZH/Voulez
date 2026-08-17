@@ -4,6 +4,7 @@ import { db } from '@/lib/supabase/server'
 import { puzzleFor } from '@/lib/puzzles'
 import type { Json, PlayerConfig } from '@/lib/puzzles/contract'
 import type { Tables } from '@/lib/supabase/types'
+import { walletFlags, type WalletFlags } from '@/lib/wallet/flags'
 
 export type VaultRow = Tables<'vaults'>
 export type PuzzleRow = Tables<'vault_puzzles'>
@@ -39,6 +40,9 @@ export type OpenedVault = {
   /** Ob neben der Auswahl auch ein eigener Vorschlag zugelassen ist. */
   allowCustomProposal: boolean
   alreadyAnswered: boolean
+  /** Welche Wallet-Knöpfe der Server anbieten kann. Ohne Zertifikate steht
+   *  hier `false`, und der Knopf erscheint gar nicht erst. */
+  wallet: WalletFlags
 }
 
 export type Playable =
@@ -137,6 +141,7 @@ export async function openedView(vault: VaultRow): Promise<OpenedVault> {
     })),
     allowCustomProposal: vault.allow_custom_proposal,
     alreadyAnswered: Boolean(answer),
+    wallet: walletFlags(),
   }
 }
 
