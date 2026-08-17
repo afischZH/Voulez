@@ -571,13 +571,27 @@ gefahrlos vorab.
 2. Die fünf PNGs in `src/assets/wallet/` sind Platzhalter — dort steht ein
    Messing-„V", nicht die Wortmarke. Vor dem ersten echten Pass ersetzen,
    Grössen exakt einhalten (siehe `src/assets/wallet/README.md`).
-3. Google: Cloud-Projekt, Wallet API aktivieren, Service-Account, Issuer-Konto
-   in der Pay & Wallet Console; den Service-Account dort unter
-   „Google Wallet API → Users" als _Developer_ eintragen, sonst 403.
-   Dann einmal `node --env-file=.env.local scripts/create-google-class.mjs`.
+3. Google, **halb fertig**. Erledigt: Cloud-Projekt `voulez-wallet`, Wallet API
+   aktiviert, Service-Account `voulez-wallet-signer@voulez-wallet.iam.gserviceaccount.com`
+   ohne Projektrollen, JSON-Schlüssel in `certs/google-wallet-key.json`.
+   `GOOGLE_WALLET_CLIENT_EMAIL` und `GOOGLE_WALLET_PRIVATE_KEY` stehen in
+   `.env.local`, der Schlüssel signiert und verifiziert nachweislich.
+   Offen, und zwar in dieser Reihenfolge:
+   1. Issuer-Konto in der Pay & Wallet Console — Unternehmensname „Voulez",
+      Form **Händler** (die einzige Alternative ist „Finanzinstitut", nur für
+      Banken), Standort **Schweiz — nicht mehr änderbar**. Dazu das Häkchen
+      bei den Zusatzbedingungen; das ist eine Vertragsannahme und gehört
+      dir, nicht einem Agenten.
+   2. Die Issuer ID von dort als `GOOGLE_WALLET_ISSUER_ID` nachtragen. Erst
+      dann steht das Flag auf `true` und der Knopf erscheint.
+   3. Denselben Service-Account in der Konsole unter „Google Wallet API →
+      Users" als _Developer_ eintragen, sonst antwortet jeder Schreibzugriff
+      mit 403.
+   4. Einmal `node --env-file=.env.local scripts/create-google-class.mjs`.
 4. `GOOGLE_WALLET_*` in der **Produktionsumgebung leer lassen**, bis die
    Freischaltung durch ist (bis zu zwei Werktage). Im Demo-Modus trägt jeder
-   Pass ein `[TEST ONLY]`-Band; in Preview setzen und dort entwickeln.
+   Pass ein `[TEST ONLY]`-Band. Entwickelt wird lokal — Preview hat hier
+   ohnehin keine Secrets, siehe §8.
 
 **Stehender Betriebspunkt:** das Apple-Pass-Zertifikat läuft am
 **16. September 2027** ab. Danach signierte Pässe lehnt Wallet ab — die Website
