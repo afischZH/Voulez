@@ -568,9 +568,12 @@ gefahrlos vorab.
    erst im nächsten Deployment), und `certs/` löschen — der private Schlüssel
    liegt dort unverschlüsselt und steckt base64-kodiert schon in `.env.local`.
    Neu ausstellen ginge jederzeit mit `./scripts/apple-pass-env.sh`.
-2. Die fünf PNGs in `src/assets/wallet/` sind Platzhalter — dort steht ein
-   Messing-„V", nicht die Wortmarke. Vor dem ersten echten Pass ersetzen,
-   Grössen exakt einhalten (siehe `src/assets/wallet/README.md`).
+2. ~~Platzhalter-Bilder~~ **erledigt.** Quelle ist `Media/Voulez_Logo.png`
+   (1024×1024, transparent). Daraus entstehen die fünf Pass-Bilder, das
+   Favicon und das Logo im Google-Unternehmensprofil — die Befehle stehen in
+   `src/assets/wallet/README.md`. Für die kleinen Grössen wird auf 460 px
+   ausgeschnitten: der äussere Ring des Medaillons trägt zwölf feine Striche,
+   die bei 29 px zu Grau zerfallen. Google bekommt das vollständige Logo.
 3. ~~Google~~ **lokal erledigt.** Cloud-Projekt `voulez-wallet`, Wallet API
    aktiviert, Service-Account
    `voulez-wallet-signer@voulez-wallet.iam.gserviceaccount.com` ohne
@@ -581,7 +584,15 @@ gefahrlos vorab.
    numerische Issuer ID. Der Service-Account steht in der Konsole unter
    „Nutzer" als _Entwickler_, die Klasse
    `3388000000023173458.voulez_einladung_v1` ist angelegt.
-4. **Noch offen bei Google:** Publishing-Zugang anfordern. Bis dahin
+4. **Noch offen bei Google, und zwar hängend:** der Knopf
+   „Veröffentlichungszugriff anfordern" in der Konsole **tut nichts**.
+   Geprüft mit Klick, Elementreferenz, Enter, Neuladen und frischem Tab:
+   beim Klick geht kein einziger Aufruf an eine `pay.google.com`-API raus,
+   nur Telemetrie an `play.google.com/log` mit HTTP 503. Keine
+   Konsolenfehler. Unternehmensprofil steht auf **Genehmigt**, Logo ist
+   hinterlegt, Checkliste bleibt bei 2/3. Das ist ein Fehler auf Googles
+   Seite — nächster Schritt ist „Support kontaktieren" in der Konsole. Bis
+   dahin
    `GOOGLE_WALLET_*` in der **Produktionsumgebung leer lassen** — im
    Demo-Modus trägt jeder Pass ein `[TEST ONLY]`-Band, und speichern können
    ihn nur die in der Konsole eingetragenen Nutzer. Entwickelt wird lokal;
