@@ -372,6 +372,18 @@ der Ticketseite, wo eine leere Variable keine Störung ist, sondern die Aussage
 > Umgebungsvariablen bei Vercel wirken erst im **nächsten** Deployment, nicht
 > rückwirkend.
 
+**Bei Vercel gibt es die Variablen nur für Production.** Preview-Bereitstellungen
+haben weder Datenbank noch Secrets — geprüft wird deshalb nach dem Merge in
+Produktion, nicht auf der Vorschau-URL. Das ist eine bewusste Entscheidung: eine
+brauchbare Preview-Umgebung bräuchte ein zweites Supabase-Projekt, sonst schriebe
+jede Vorschau in die Produktionsdatenbank und verschickte echte Mails.
+
+> **Die Falle dabei:** `SITE_URL` wirft nicht, sondern fällt still auf
+> `http://localhost:3000` zurück. In einer Umgebung ohne diese Variable
+> entstünden Wallet-Pässe, deren QR-Code auf localhost zeigt — auf der Karte
+> sähe alles richtig aus. Wer je eine zweite Umgebung aufsetzt, setzt `SITE_URL`
+> als Erstes.
+
 ### Dateien
 
 | Datei                 | Inhalt                                                                  |
